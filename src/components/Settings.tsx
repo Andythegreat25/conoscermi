@@ -1,5 +1,6 @@
-import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw, Camera, User } from 'lucide-react';
+import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw, Camera, User, FileText } from 'lucide-react';
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
+import { DiaryEntry } from '../types';
 
 interface SettingsProps {
   onBack: () => void;
@@ -26,6 +27,7 @@ export function Settings({
 }: SettingsProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [storageSize, setStorageSize] = useState('0 KB');
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -78,6 +80,73 @@ export function Settings({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = async () => {
+    setIsExportingPDF(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const entriesStr = localStorage.getItem('diary_entries');
+      if (!entriesStr) return;
+      
+      const entries: DiaryEntry[] = JSON.parse(entriesStr);
+      const doc = new jsPDF();
+      
+      // Title
+      doc.setFontSize(22);
+      doc.setTextColor(40, 40, 40);
+      doc.text("Il Mio Diario - Conoscermi", 20, 20);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Esportato il: ${new Date().toLocaleDateString('it-IT')}`, 20, 30);
+      
+      let y = 45;
+      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const maxWidth = pageWidth - (margin * 2);
+
+      // Sort entries by timestamp (newest first)
+      const sortedEntries = [...entries].sort((a, b) => b.timestamp - a.timestamp);
+
+      sortedEntries.forEach((entry) => {
+        // Check if we need a new page (approximate height of an entry)
+        const lines = doc.splitTextToSize(entry.note || "Nessuna nota.", maxWidth);
+        const entryHeight = (lines.length * 7) + 25;
+
+        if (y + entryHeight > 280) {
+          doc.addPage();
+          y = 20;
+        }
+
+        // Date and Mood
+        doc.setFontSize(14);
+        doc.setTextColor(40, 40, 40);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${entry.date} - ${entry.mood}`, margin, y);
+        y += 7;
+
+        // Time
+        doc.setFontSize(10);
+        doc.setTextColor(150, 150, 150);
+        doc.setFont("helvetica", "normal");
+        doc.text(entry.time, margin, y);
+        y += 7;
+
+        // Note
+        doc.setFontSize(12);
+        doc.setTextColor(60, 60, 60);
+        doc.text(lines, margin, y);
+        
+        y += (lines.length * 7) + 15; // Add spacing after entry
+      });
+
+      doc.save(`conoscermi-diario-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error("PDF Export failed:", error);
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   const handleClearAll = () => {
@@ -301,6 +370,18 @@ export function Settings({
           </div>
 
           <div className="grid grid-cols-1 gap-4">
+            <button 
+              onClick={handleExportPDF}
+              disabled={isExportingPDF}
+              className="flex items-center justify-center gap-3 bg-primary text-white font-bold py-4 px-6 rounded-full hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+            >
+              {isExportingPDF ? (
+                <RefreshCw size={20} className="animate-spin" />
+              ) : (
+                <FileText size={20} />
+              )}
+              Esporta Diario (PDF)
+            </button>
             <button 
               onClick={handleExport}
               className="flex items-center justify-center gap-3 bg-surface-container-highest text-primary font-bold py-4 px-6 rounded-full hover:bg-outline-variant/20 transition-all active:scale-95"

@@ -1,5 +1,6 @@
-import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock } from 'lucide-react';
+import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Sparkles } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
+import { useMemo } from 'react';
 
 interface HomeProps {
   onNavigateToDiary: () => void;
@@ -31,6 +32,28 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
   };
 
   const dailyQuote = getDailyQuote();
+
+  // Time Capsule Logic
+  const timeCapsuleEntry = useMemo(() => {
+    if (!entries || entries.length === 0) return null;
+    
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    
+    // Check for 1 month ago (approx 30 days) or 1 year ago (365 days)
+    const checkIntervals = [30, 365];
+    
+    for (const days of checkIntervals) {
+      const targetDate = new Date(now);
+      targetDate.setDate(targetDate.getDate() - days);
+      const targetDateStr = targetDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
+      
+      const entry = entries.find(e => e.date === targetDateStr);
+      if (entry) return { entry, daysAgo: days };
+    }
+    
+    return null;
+  }, [entries]);
 
   // Calculate streak (consecutive days)
   const calculateStreak = () => {
@@ -124,6 +147,44 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
           Come mi sento?
         </button>
       </section>
+
+      {/* Time Capsule Section */}
+      {timeCapsuleEntry && (
+        <section className="animate-in zoom-in-95 duration-700">
+          <div className="bg-gradient-to-br from-secondary-container/40 to-surface-container-high rounded-2xl p-6 border border-secondary/10 relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <History size={120} />
+            </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+                <History size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">Capsula del Tempo</h3>
+                <p className="text-[10px] text-on-surface-variant font-medium uppercase tracking-widest">
+                  {timeCapsuleEntry.daysAgo === 30 ? "Un mese fa" : "Un anno fa"} • {timeCapsuleEntry.entry.date}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white/40 dark:bg-black/20 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <p className="text-on-surface font-medium italic leading-relaxed line-clamp-3">
+                "{timeCapsuleEntry.entry.note || "Nessuna nota scritta quel giorno."}"
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-secondary/20 text-secondary rounded-full uppercase">
+                  {timeCapsuleEntry.entry.mood}
+                </span>
+              </div>
+            </div>
+            <button 
+              onClick={onNavigateToDiary}
+              className="mt-4 w-full py-2 text-xs font-bold text-secondary uppercase tracking-widest hover:underline underline-offset-4"
+            >
+              Vedi nel diario →
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Daily Quote Card */}
       <section 
