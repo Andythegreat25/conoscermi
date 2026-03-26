@@ -9,6 +9,28 @@ interface HomeProps {
 }
 
 export function Home({ onNavigateToDiary, onNavigateToCheckIn, lastMood, entries }: HomeProps) {
+  const quotes = [
+    "Ogni giorno è un piccolo passo verso una nuova te.",
+    "La tua crescita è un viaggio, non una destinazione.",
+    "Sii gentile con te stessa oggi.",
+    "Piccoli progressi ogni giorno portano a grandi risultati.",
+    "Il tuo benessere è una priorità, non un lusso.",
+    "Ascolta il tuo cuore, ha sempre qualcosa da dirti.",
+    "Oggi è un'opportunità per ricominciare con amore.",
+    "La forza non viene da ciò che puoi fare, ma dal superare ciò che pensavi di non poter fare.",
+    "Respira. Sei esattamente dove devi essere.",
+    "Coltiva la gratitudine e vedrai fiorire la tua anima."
+  ];
+
+  const getDailyQuote = () => {
+    const today = new Date();
+    // Use the day of the year or just the date to pick a quote
+    const index = (today.getFullYear() + today.getMonth() + today.getDate()) % quotes.length;
+    return quotes[index];
+  };
+
+  const dailyQuote = getDailyQuote();
+
   // Calculate streak (consecutive days)
   const calculateStreak = () => {
     if (!entries || entries.length === 0) return 0;
@@ -109,7 +131,7 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, lastMood, entries
         </div>
         <div className="relative z-10">
           <p className="text-on-surface-variant font-body text-xl leading-relaxed italic text-center">
-            "Ogni giorno è un piccolo passo verso una nuova te."
+            "{dailyQuote}"
           </p>
           <div className="w-12 h-1 bg-primary-container/40 mx-auto mt-6 rounded-full"></div>
         </div>

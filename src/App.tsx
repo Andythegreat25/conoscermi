@@ -173,14 +173,14 @@ export default function App() {
   const handleSaveEntry = (newEntryData: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => {
     const now = new Date();
     const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
-    const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+    const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
     
     const newEntry: DiaryEntry = {
       ...newEntryData,
       id: crypto.randomUUID(),
       timestamp: now.getTime(),
       date: now.toLocaleDateString('it-IT', dateOpts).toUpperCase(),
-      time: now.toLocaleTimeString('en-US', timeOpts),
+      time: now.toLocaleTimeString('it-IT', timeOpts),
       uid: 'local-user'
     };
 
