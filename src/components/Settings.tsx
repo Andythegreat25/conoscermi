@@ -1,4 +1,4 @@
-import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key } from 'lucide-react';
+import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface SettingsProps {
@@ -6,9 +6,10 @@ interface SettingsProps {
   remindersEnabled: boolean;
   onToggleReminders: (enabled: boolean) => void;
   onLogout: () => void;
+  onCheckUpdates: () => void;
 }
 
-export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout }: SettingsProps) {
+export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout, onCheckUpdates }: SettingsProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [storageSize, setStorageSize] = useState('0 KB');
 
@@ -195,6 +196,13 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout
             <p className="text-sm text-on-secondary-container leading-relaxed">
               I tuoi dati restano con te anche quando il mondo svanisce.
             </p>
+            <button 
+              onClick={onCheckUpdates}
+              className="w-full flex items-center justify-center gap-2 bg-secondary text-on-secondary font-bold py-3 rounded-full hover:opacity-90 transition-opacity active:scale-95 text-sm"
+            >
+              <RefreshCw size={16} />
+              Controlla aggiornamenti
+            </button>
           </div>
         </div>
 

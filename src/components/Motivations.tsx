@@ -1,68 +1,151 @@
-import { Heart, Zap, Sparkles, Leaf, Sun, Pin, Quote } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Heart, Zap, Sparkles, Leaf, Sun, Pin, Quote, RefreshCw, Loader2, Star } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
 
-const ALL_QUOTES = [
-  { id: 1, text: "Scegli te stessa oggi.", category: "Pace interiore", icon: "heart", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=800" },
-  { id: 2, text: "Il silenzio è la tua forza.", category: "Forza", icon: "zap" },
-  { id: 3, text: "Un passo alla volta.", category: "Pazienza", icon: "sparkles" },
-  { id: 4, text: "La tua rinascita è un atto di coraggio quotidiano.", category: "Coraggio", icon: "leaf" },
-  { id: 5, text: "Domani è una tela bianca.", category: "Futuro", icon: "sun" },
-  { id: 6, text: "Coltiva la pazienza.", category: "Pazienza", icon: "leaf" },
-  { id: 7, text: "Non sei in ritardo, sei esattamente dove devi essere.", category: "Consapevolezza", icon: "pin", image: "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?auto=format&fit=crop&q=80&w=800" },
-  { id: 8, text: "Ogni tempesta ha una fine.", category: "Speranza", icon: "sun" },
-  { id: 9, text: "La vulnerabilità è la tua più grande forza.", category: "Coraggio", icon: "zap" },
-  { id: 10, text: "Respira. Sei viva.", category: "Presenza", icon: "leaf" },
-  { id: 11, text: "Lascia andare ciò che non puoi controllare.", category: "Pace interiore", icon: "sparkles" },
-  { id: 12, text: "Il tuo valore non dipende dalla tua produttività.", category: "Accettazione", icon: "heart" },
-  { id: 13, text: "Fai spazio per le cose belle.", category: "Positività", icon: "sun", image: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&q=80&w=800" },
-  { id: 14, text: "Sei abbastanza, così come sei.", category: "Amore proprio", icon: "heart" },
-  { id: 15, text: "Le piccole vittorie contano.", category: "Progresso", icon: "pin" },
-  { id: 16, text: "Abbraccia l'incertezza.", category: "Crescita", icon: "zap" },
-  { id: 17, text: "Il sole sorgerà ancora.", category: "Speranza", icon: "sun" },
-  { id: 18, text: "Ascolta il tuo corpo.", category: "Cura di sé", icon: "leaf" },
-  { id: 19, text: "Oggi è un buon giorno per ricominciare.", category: "Nuovo inizio", icon: "sparkles", image: "https://images.unsplash.com/photo-1470240731273-7821a6eeb6bd?auto=format&fit=crop&q=80&w=800" },
-  { id: 20, text: "Non devi avere tutto sotto controllo.", category: "Pace interiore", icon: "pin" }
+interface QuoteData {
+  id: string | number;
+  text: string;
+  author: string;
+  category: string;
+  icon: string;
+  image?: string;
+}
+
+const CATEGORIES = [
+  'Tutte',
+  'Preferiti',
+  'Pace interiore',
+  'Forza',
+  'Pazienza',
+  'Coraggio',
+  'Consapevolezza',
+  'Speranza',
+  'Amore proprio',
+  'Crescita'
 ];
+
+const CATEGORY_MAP: Record<string, string> = {
+  'peace': 'Pace interiore',
+  'strength': 'Forza',
+  'patience': 'Pazienza',
+  'courage': 'Coraggio',
+  'mindfulness': 'Consapevolezza',
+  'hope': 'Speranza',
+  'love': 'Amore proprio',
+  'growth': 'Crescita'
+};
+
+const ICONS = ['heart', 'zap', 'sparkles', 'leaf', 'sun', 'pin'];
 
 export function Motivations() {
   const [activeCategory, setActiveCategory] = useState<string>('Tutte');
+  const [quotes, setQuotes] = useState<QuoteData[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const categories = useMemo(() => {
-    const cats = new Set(ALL_QUOTES.map(q => q.category));
-    return ['Tutte', ...Array.from(cats)];
+  // Load favorites from localStorage
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('favorite_quotes');
+    if (savedFavorites) {
+      try {
+        setFavorites(JSON.parse(savedFavorites));
+      } catch (e) {
+        console.error("Failed to parse favorites", e);
+      }
+    }
   }, []);
 
-  // Select 6 quotes based on the current date so they change daily
+  // Save favorites to localStorage
+  useEffect(() => {
+    localStorage.setItem('favorite_quotes', JSON.stringify(favorites));
+  }, [favorites]);
+
+  const fetchQuotes = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Using type.fit API as it's reliable and CORS-friendly
+      const response = await fetch('https://type.fit/api/quotes');
+      if (!response.ok) throw new Error('Errore nel caricamento delle citazioni');
+      const data = await response.json();
+      
+      // Transform and categorize data
+      const transformed: QuoteData[] = data.slice(0, 100).map((q: any, index: number) => {
+        const text = q.text;
+        const author = q.author?.replace(', type.fit', '') || 'Anonimo';
+        
+        // Simple categorization based on keywords
+        let category = 'Crescita';
+        if (text.toLowerCase().includes('peace') || text.toLowerCase().includes('calm')) category = 'Pace interiore';
+        else if (text.toLowerCase().includes('strength') || text.toLowerCase().includes('power')) category = 'Forza';
+        else if (text.toLowerCase().includes('wait') || text.toLowerCase().includes('patience')) category = 'Pazienza';
+        else if (text.toLowerCase().includes('fear') || text.toLowerCase().includes('courage')) category = 'Coraggio';
+        else if (text.toLowerCase().includes('mind') || text.toLowerCase().includes('present')) category = 'Consapevolezza';
+        else if (text.toLowerCase().includes('hope') || text.toLowerCase().includes('light')) category = 'Speranza';
+        else if (text.toLowerCase().includes('love') || text.toLowerCase().includes('self')) category = 'Amore proprio';
+        else {
+          // Randomly assign from our list if no keyword matches
+          const randomCats = CATEGORIES.slice(2);
+          category = randomCats[index % randomCats.length];
+        }
+
+        return {
+          id: `api-${index}`,
+          text,
+          author,
+          category,
+          icon: ICONS[index % ICONS.length],
+          image: index % 10 === 0 ? `https://picsum.photos/seed/quote-${index}/800/600` : undefined
+        };
+      });
+
+      setQuotes(transformed);
+    } catch (err) {
+      console.error(err);
+      setError('Non è stato possibile caricare le citazioni esterne. Riprova più tardi.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
+
+  const toggleFavorite = (id: string | number) => {
+    setFavorites(prev => 
+      prev.includes(id.toString()) 
+        ? prev.filter(fid => fid !== id.toString()) 
+        : [...prev, id.toString()]
+    );
+  };
+
   const dailyQuotes = useMemo(() => {
+    if (quotes.length === 0) return [];
     const today = new Date();
-    // Create a seed based on the current day (YYYYMMDD)
     const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
     
-    // Simple seeded random function
     const random = (s: number) => {
       const x = Math.sin(s) * 10000;
       return x - Math.floor(x);
     };
 
-    // Shuffle the quotes using the seed
-    const shuffled = [...ALL_QUOTES].sort((a, b) => random(seed + a.id) - random(seed + b.id));
+    const shuffled = [...quotes].sort((a, b) => random(seed + Number(a.id.toString().split('-')[1])) - random(seed + Number(b.id.toString().split('-')[1])));
     
-    // Ensure the first quote has an image for the hero section
-    const heroIndex = shuffled.findIndex(q => q.image);
-    if (heroIndex > 0) {
-      const heroQuote = shuffled.splice(heroIndex, 1)[0];
-      shuffled.unshift(heroQuote);
-    }
-
-    return shuffled.slice(0, 6);
-  }, []);
+    // Ensure hero has a nice image
+    const heroQuote = { ...shuffled[0] };
+    heroQuote.image = `https://images.unsplash.com/photo-1499209974431-9dac3adaf471?auto=format&fit=crop&q=80&w=800&seed=${seed}`;
+    
+    return [heroQuote, ...shuffled.slice(1, 6)];
+  }, [quotes]);
 
   const filteredQuotes = useMemo(() => {
     if (activeCategory === 'Tutte') return null;
-    return ALL_QUOTES.filter(q => q.category === activeCategory);
-  }, [activeCategory]);
-
-  const [heroQuote, bento1, bento2, wideQuote, bottom1, bottom2] = dailyQuotes;
+    if (activeCategory === 'Preferiti') {
+      return quotes.filter(q => favorites.includes(q.id.toString()));
+    }
+    return quotes.filter(q => q.category === activeCategory);
+  }, [activeCategory, quotes, favorites]);
 
   const renderIcon = (iconName: string, className: string, size: number = 24) => {
     switch (iconName) {
@@ -76,8 +159,39 @@ export function Motivations() {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
+        <Loader2 className="text-primary animate-spin" size={40} />
+        <p className="text-on-surface-variant font-medium">Caricamento saggezza...</p>
+      </div>
+    );
+  }
+
+  if (error && quotes.length === 0) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center space-y-6 p-6">
+        <div className="w-20 h-20 bg-error/10 rounded-full flex items-center justify-center text-error">
+          <RefreshCw size={40} />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-xl font-bold text-on-surface">Ops! Qualcosa è andato storto</h3>
+          <p className="text-on-surface-variant">{error}</p>
+        </div>
+        <button 
+          onClick={fetchQuotes}
+          className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold shadow-sm active:scale-95 transition-transform"
+        >
+          Riprova
+        </button>
+      </div>
+    );
+  }
+
+  const [heroQuote, bento1, bento2, wideQuote, bottom1, bottom2] = dailyQuotes;
+
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       <section className="mb-8">
         <h2 className="text-4xl font-extrabold tracking-tight text-primary mb-2">Motivazioni</h2>
         <p className="text-on-surface-variant font-medium leading-relaxed">
@@ -86,16 +200,17 @@ export function Motivations() {
       </section>
 
       <div className="flex gap-3 overflow-x-auto hide-scrollbar mb-8 -mx-6 px-6">
-        {categories.map(cat => (
+        {CATEGORIES.map(cat => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-colors duration-200 shrink-0 ${
+            className={`px-6 py-2.5 rounded-full font-semibold text-sm transition-colors duration-200 shrink-0 flex items-center gap-2 ${
               activeCategory === cat
                 ? 'bg-secondary-container text-on-secondary-container'
                 : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
             }`}
           >
+            {cat === 'Preferiti' && <Star size={14} fill={activeCategory === 'Preferiti' ? 'currentColor' : 'none'} />}
             {cat}
           </button>
         ))}
@@ -104,114 +219,128 @@ export function Motivations() {
       {activeCategory === 'Tutte' ? (
         <div className="grid grid-cols-1 gap-6">
           {/* Large Card Feature */}
-          <div className="relative group rounded-lg overflow-hidden h-[320px] bg-gradient-to-br from-primary to-primary-container p-8 flex flex-col justify-end shadow-[0_12px_32px_rgba(140,78,55,0.15)]">
+          <div className="relative group rounded-lg overflow-hidden h-[360px] bg-gradient-to-br from-primary to-primary-container p-8 flex flex-col justify-end shadow-[0_12px_32px_rgba(140,78,55,0.15)]">
             <div className="absolute top-6 right-6 z-20">
-              <button className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform">
-                <Heart size={20} className="fill-current" />
+              <button 
+                onClick={() => toggleFavorite(heroQuote.id)}
+                className={`w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-90 transition-all ${
+                  favorites.includes(heroQuote.id.toString()) 
+                    ? 'bg-primary text-white' 
+                    : 'bg-white/20 text-white'
+                }`}
+              >
+                <Heart size={24} fill={favorites.includes(heroQuote.id.toString()) ? 'currentColor' : 'none'} />
               </button>
             </div>
-            <div className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none">
+            <div className="absolute top-0 left-0 w-full h-full opacity-40 pointer-events-none">
               <img 
-                src={heroQuote.image || "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&q=80&w=800"} 
+                src={heroQuote.image} 
                 alt="Background" 
                 className="w-full h-full object-cover mix-blend-overlay"
+                referrerPolicy="no-referrer"
               />
             </div>
-            <h3 className="text-white text-3xl font-bold leading-tight relative z-10">{heroQuote.text}</h3>
-            <p className="text-white/80 text-sm mt-3 font-medium uppercase tracking-widest relative z-10">{heroQuote.category}</p>
+            <div className="relative z-10 space-y-4">
+              <Quote size={40} className="text-white/40" />
+              <h3 className="text-white text-3xl font-bold leading-tight">{heroQuote.text}</h3>
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-white/80 text-sm font-medium uppercase tracking-widest">{heroQuote.category}</p>
+                <p className="text-white/60 text-xs italic">— {heroQuote.author}</p>
+              </div>
+            </div>
           </div>
 
           {/* Bento Mini Grid */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-surface-container-low p-6 rounded-lg aspect-square flex flex-col justify-between transition-all hover:bg-surface-container-high">
-              <div className="flex justify-between items-start">
-                {renderIcon(bento1.icon, "text-secondary")}
-                <button className="text-outline hover:text-primary transition-colors">
-                  <Heart size={20} />
-                </button>
+            {[bento1, bento2].map((q, i) => (
+              <div key={q.id} className={`${i === 0 ? 'bg-surface-container-low' : 'bg-secondary-container/30'} p-6 rounded-lg aspect-square flex flex-col justify-between transition-all hover:bg-opacity-80 group`}>
+                <div className="flex justify-between items-start">
+                  {renderIcon(q.icon, i === 0 ? "text-secondary" : "text-primary")}
+                  <button 
+                    onClick={() => toggleFavorite(q.id)}
+                    className={`transition-colors ${favorites.includes(q.id.toString()) ? 'text-primary' : 'text-outline group-hover:text-primary'}`}
+                  >
+                    <Heart size={20} fill={favorites.includes(q.id.toString()) ? 'currentColor' : 'none'} />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <p className={`${i === 0 ? 'text-primary' : 'text-on-secondary-container'} font-bold text-lg leading-snug line-clamp-4`}>{q.text}</p>
+                  <p className="text-[10px] text-on-surface-variant/60 italic">— {q.author}</p>
+                </div>
               </div>
-              <p className="text-primary font-bold text-lg leading-snug">{bento1.text}</p>
-            </div>
-
-            <div className="bg-secondary-container/30 p-6 rounded-lg aspect-square flex flex-col justify-between transition-all hover:bg-secondary-container/50">
-              <div className="flex justify-between items-start">
-                {renderIcon(bento2.icon, "text-primary")}
-                <button className="text-outline hover:text-primary transition-colors">
-                  <Heart size={20} />
-                </button>
-              </div>
-              <p className="text-on-secondary-container font-bold text-lg leading-snug">{bento2.text}</p>
-            </div>
+            ))}
           </div>
 
           {/* Wide Card */}
-          <div className="bg-surface-container p-8 rounded-lg flex items-center gap-6 relative overflow-hidden transition-all hover:bg-surface-container-high">
+          <div className="bg-surface-container p-8 rounded-lg flex items-center gap-6 relative overflow-hidden transition-all hover:bg-surface-container-high group">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               {renderIcon(wideQuote.icon, "text-primary", 28)}
             </div>
-            <div className="flex-1">
+            <div className="flex-1 space-y-2">
               <p className="text-primary font-bold text-xl leading-tight italic">"{wideQuote.text}"</p>
+              <p className="text-xs text-on-surface-variant/60">— {wideQuote.author}</p>
             </div>
-            <button className="absolute top-4 right-4 text-outline-variant hover:text-primary">
-              <Heart size={20} className="fill-current text-outline-variant" />
+            <button 
+              onClick={() => toggleFavorite(wideQuote.id)}
+              className={`absolute top-4 right-4 transition-colors ${favorites.includes(wideQuote.id.toString()) ? 'text-primary' : 'text-outline-variant group-hover:text-primary'}`}
+            >
+              <Heart size={20} fill={favorites.includes(wideQuote.id.toString()) ? 'currentColor' : 'none'} />
             </button>
           </div>
 
           {/* Bottom Grid */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-surface-container-highest/40 p-6 rounded-lg flex flex-col justify-between aspect-[3/4] relative group">
-              {renderIcon(bottom1.icon, "text-on-surface-variant")}
-              <p className="text-on-surface font-bold text-lg leading-snug">{bottom1.text}</p>
-              <button className="absolute bottom-6 right-6 text-outline transition-colors group-hover:text-primary">
-                <Pin size={20} />
-              </button>
-            </div>
-            
-            <div className="bg-primary-container/20 p-6 rounded-lg flex flex-col justify-between aspect-[3/4] relative group">
-              {renderIcon(bottom2.icon, "text-primary")}
-              <p className="text-primary font-bold text-lg leading-snug">{bottom2.text}</p>
-              <button className="absolute bottom-6 right-6 text-outline transition-colors group-hover:text-primary">
-                <Heart size={20} />
-              </button>
-            </div>
+            {[bottom1, bottom2].map((q, i) => (
+              <div key={q.id} className={`${i === 0 ? 'bg-surface-container-highest/40' : 'bg-primary-container/20'} p-6 rounded-lg flex flex-col justify-between aspect-[3/4] relative group`}>
+                {renderIcon(q.icon, i === 0 ? "text-on-surface-variant" : "text-primary")}
+                <div className="space-y-2">
+                  <p className={`${i === 0 ? 'text-on-surface' : 'text-primary'} font-bold text-lg leading-snug line-clamp-5`}>{q.text}</p>
+                  <p className="text-[10px] text-on-surface-variant/60 italic">— {q.author}</p>
+                </div>
+                <button 
+                  onClick={() => toggleFavorite(q.id)}
+                  className={`absolute bottom-6 right-6 transition-colors ${favorites.includes(q.id.toString()) ? 'text-primary' : 'text-outline group-hover:text-primary'}`}
+                >
+                  <Heart size={20} fill={favorites.includes(q.id.toString()) ? 'currentColor' : 'none'} />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-300">
-          {filteredQuotes?.map(quote => {
-            if (quote.image) {
-              return (
-                <div key={quote.id} className="col-span-2 relative group rounded-lg overflow-hidden h-[200px] bg-gradient-to-br from-primary to-primary-container p-6 flex flex-col justify-end shadow-sm">
-                  <div className="absolute top-4 right-4 z-20">
-                    <button className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform">
-                      <Heart size={16} className="fill-current" />
-                    </button>
+        <div className="grid grid-cols-1 gap-4 animate-in fade-in duration-300">
+          {filteredQuotes?.length === 0 ? (
+            <div className="py-20 text-center space-y-4">
+              <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto text-outline-variant">
+                <Star size={32} />
+              </div>
+              <p className="text-on-surface-variant font-medium">Nessuna citazione trovata in questa categoria.</p>
+            </div>
+          ) : (
+            filteredQuotes?.map(quote => (
+              <div key={quote.id} className="bg-surface-container-low p-6 rounded-lg flex flex-col justify-between transition-all hover:bg-surface-container-high group relative">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    {renderIcon(quote.icon, "text-primary")}
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">{quote.category}</span>
                   </div>
-                  <div className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none">
-                    <img 
-                      src={quote.image} 
-                      alt="Background" 
-                      className="w-full h-full object-cover mix-blend-overlay"
-                    />
-                  </div>
-                  <h3 className="text-white text-xl font-bold leading-tight relative z-10">{quote.text}</h3>
-                </div>
-              );
-            }
-            return (
-              <div key={quote.id} className="bg-surface-container-low p-6 rounded-lg aspect-square flex flex-col justify-between transition-all hover:bg-surface-container-high">
-                <div className="flex justify-between items-start">
-                  {renderIcon(quote.icon, "text-primary")}
-                  <button className="text-outline hover:text-primary transition-colors">
-                    <Heart size={20} />
+                  <button 
+                    onClick={() => toggleFavorite(quote.id)}
+                    className={`transition-colors ${favorites.includes(quote.id.toString()) ? 'text-primary' : 'text-outline group-hover:text-primary'}`}
+                  >
+                    <Heart size={20} fill={favorites.includes(quote.id.toString()) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                <p className="text-primary font-bold text-lg leading-snug">{quote.text}</p>
+                <div className="space-y-3">
+                  <p className="text-on-surface font-bold text-xl leading-snug">"{quote.text}"</p>
+                  <p className="text-sm text-on-surface-variant italic">— {quote.author}</p>
+                </div>
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
       )}
     </div>
   );
 }
+

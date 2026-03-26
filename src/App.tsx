@@ -10,8 +10,53 @@ import { Settings } from './components/Settings';
 import { ReminderBanner } from './components/ReminderBanner';
 import { PinLock } from './components/PinLock';
 import { DiaryEntry } from './types';
+import { Toaster, toast } from 'sonner';
+import { useRegisterSW } from 'virtual:pwa-register/react';
+import { RefreshCw } from 'lucide-react';
 
 export default function App() {
+  const {
+    offlineReady: [offlineReady, setOfflineReady],
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 15 * 60 * 1000);
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (offlineReady) {
+      toast.success('App pronta per l\'uso offline', {
+        description: 'L\'app è stata salvata sul tuo dispositivo.',
+        duration: 5000,
+      });
+      setOfflineReady(false);
+    }
+  }, [offlineReady, setOfflineReady]);
+
+  useEffect(() => {
+    if (needRefresh) {
+      toast('Aggiornamento disponibile', {
+        description: 'È disponibile una nuova versione dell\'app. Ricarica per aggiornare.',
+        icon: <RefreshCw className="animate-spin text-primary" size={20} />,
+        duration: Infinity,
+        action: {
+          label: 'Ricarica ora',
+          onClick: () => updateServiceWorker(true),
+        },
+        cancel: {
+          label: 'Più tardi',
+          onClick: () => setNeedRefresh(false),
+        },
+      });
+    }
+  }, [needRefresh, setNeedRefresh, updateServiceWorker]);
+
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   
@@ -136,6 +181,7 @@ export default function App() {
           remindersEnabled={remindersEnabled}
           onToggleReminders={handleToggleReminders}
           onLogout={handleLogout}
+          onCheckUpdates={() => updateServiceWorker(true)}
         />
       );
     }
@@ -170,6 +216,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary-container selection:text-on-primary-container flex justify-center">
+      <Toaster position="top-center" richColors />
       <div className="w-full max-w-[430px] relative min-h-screen pb-28">
         {!showSettings && (
           <TopBar 
