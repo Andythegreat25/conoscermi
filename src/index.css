@@ -61,6 +61,16 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Hide scrollbar globally for a native app feel */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
