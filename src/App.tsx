@@ -45,6 +45,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   
   const [currentTab, setCurrentTab] = useState<Tab>('home');
   const [showSettings, setShowSettings] = useState(false);
@@ -94,11 +95,17 @@ export default function App() {
   }, [user, isAuthReady]);
 
   const handleLogin = async () => {
+    setLoginError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      if (error.code === 'auth/popup-blocked') {
+        setLoginError("Il popup di accesso è stato bloccato dal browser. Clicca sull'icona 'Apri in una nuova scheda' in alto a destra, oppure consenti i popup per questo sito.");
+      } else {
+        setLoginError("Errore durante l'accesso. Riprova più tardi.");
+      }
     }
   };
 
@@ -179,6 +186,13 @@ export default function App() {
       <div className="min-h-screen bg-surface flex flex-col items-center justify-center text-on-surface p-6">
         <h1 className="text-4xl font-extrabold text-primary mb-2">Nuovo Inizio</h1>
         <p className="text-on-surface-variant mb-8 text-center">Accedi per salvare i tuoi progressi e il tuo diario in modo sicuro.</p>
+        
+        {loginError && (
+          <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-xl text-sm text-center border border-red-200">
+            {loginError}
+          </div>
+        )}
+
         <button 
           onClick={handleLogin}
           className="bg-primary text-on-primary px-6 py-3 rounded-full font-bold shadow-sm active:scale-95 transition-transform"
@@ -215,7 +229,7 @@ export default function App() {
       case 'diary':
         return <Diary entries={entries} onAddEntry={() => setCurrentTab('checkin')} />;
       case 'journey':
-        return <Journey />;
+        return <Journey entries={entries} />;
       case 'motivations':
         return <Motivations />;
       default:
