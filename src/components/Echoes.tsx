@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { MessageCircle, Upload, Send, User, Sparkles, Trash2, ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { EchoMessage, Persona } from '../types';
 import { GoogleGenAI } from "@google/genai";
+import { toast } from 'sonner';
 
 interface EchoesProps {
   apiKey: string;
@@ -36,16 +37,19 @@ export function Echoes({ apiKey }: EchoesProps) {
     const lines = text.split('\n');
     const messagesByPerson: Record<string, string[]> = {};
     
-    // Simple regex to match WhatsApp format: [Date, Time] Name: Message or Date, Time - Name: Message
-    const msgRegex = /(?:\[?(\d{2}\/\d{2}\/\d{2,4}),\s(\d{2}:\d{2}(?::\d{2})?)\]?|(\d{2}\/\d{2}\/\d{2,4}),\s(\d{2}:\d{2})\s-)\s([^:]+):\s(.*)/;
+    // Improved regex to be more flexible with date formats and separators
+    // Matches: [26/03/26, 17:55:20] Name: Message OR 26/03/26, 17:55 - Name: Message
+    const msgRegex = /(?:\[?(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}),?\s(\d{1,2}:\d{2}(?::\d{2})?(?:\s?[ap]m)?)\]?|(\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}),?\s(\d{1,2}:\d{2})\s-)\s([^:]+):\s(.*)/i;
 
     lines.forEach(line => {
       const match = line.match(msgRegex);
       if (match) {
-        const name = match[5].trim();
-        const content = match[6].trim();
-        if (!messagesByPerson[name]) messagesByPerson[name] = [];
-        messagesByPerson[name].push(content);
+        const name = (match[5] || "").trim();
+        const content = (match[6] || "").trim();
+        if (name && content) {
+          if (!messagesByPerson[name]) messagesByPerson[name] = [];
+          messagesByPerson[name].push(content);
+        }
       }
     });
 
@@ -73,37 +77,78 @@ export function Echoes({ apiKey }: EchoesProps) {
     setIsImporting(true);
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      const newPersona = parseWhatsApp(text);
-      if (newPersona) {
-        setPersona(newPersona);
-        setMessages([{
-          id: 'welcome',
-          role: 'persona',
-          content: `Ciao! Sono pronta a parlare con te come farebbe ${newPersona.name}. Di cosa vuoi parlare?`,
-          timestamp: Date.now()
-        }]);
+      try {
+        const text = event.target?.result as string;
+        const newPersona = parseWhatsApp(text);
+        if (newPersona) {
+          setPersona(newPersona);
+          setMessages([{
+            id: 'welcome',
+            role: 'persona',
+            content: `Ciao! Sono pronta a parlare con te come farebbe ${newPersona.name}. Di cosa vuoi parlare?`,
+            timestamp: Date.now()
+          }]);
+          toast.success("Chat importata!", {
+            description: `Profilo di ${newPersona.name} creato con successo.`
+          });
+        } else {
+          toast.error("Errore di importazione", {
+            description: "Non ho trovato messaggi validi nel file. Assicurati che sia un export di WhatsApp senza media."
+          });
+        }
+      } catch (err) {
+        console.error("Import error:", err);
+        toast.error("Errore durante la lettura del file");
+      } finally {
+        setIsImporting(false);
       }
+    };
+    reader.onerror = () => {
+      toast.error("Errore nel caricamento del file");
       setIsImporting(false);
     };
     reader.readAsText(file);
   };
 
   const handleSendMessage = async () => {
-    if (!input.trim() || !persona || !apiKey) return;
+    console.log("Attempting to send message...");
+    if (!input.trim() || !persona) {
+      console.log("Missing input or persona", { input: !!input.trim(), persona: !!persona });
+      return;
+    }
+
+    if (!apiKey) {
+      console.log("Missing API Key");
+      toast.error("Configurazione mancante", {
+        description: "L'API Key di Gemini non è stata trovata. Controlla le impostazioni dell'app."
+      });
+      return;
+    }
+
+    const generateId = () => {
+      try {
+        return crypto.randomUUID();
+      } catch (e) {
+        return Math.random().toString(36).substring(2) + Date.now().toString(36);
+      }
+    };
 
     const userMsg: EchoMessage = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       role: 'user',
       content: input,
       timestamp: Date.now()
     };
 
+    console.log("Adding user message to state...");
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
 
+    const toastId = toast.loading("L'eco sta scrivendo...");
+
     try {
+      console.log("Calling Gemini API...");
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
@@ -132,15 +177,21 @@ export function Echoes({ apiKey }: EchoesProps) {
         }
       });
 
+      console.log("Gemini response received");
       const personaMsg: EchoMessage = {
-        id: crypto.randomUUID(),
+        id: generateId(),
         role: 'persona',
         content: response.text || "...",
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, personaMsg]);
+      toast.dismiss(toastId);
     } catch (error) {
       console.error("Gemini Error:", error);
+      toast.error("Errore di comunicazione", {
+        id: toastId,
+        description: "Non è stato possibile ricevere una risposta dall'eco digitale. Riprova tra poco."
+      });
     } finally {
       setIsTyping(false);
     }
