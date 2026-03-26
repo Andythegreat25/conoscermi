@@ -140,7 +140,7 @@ export default function App() {
     if (remindersEnabled && !hasCheckedInToday && dismissedDate !== todayStr) {
       if ('Notification' in window && Notification.permission === 'granted') {
         const timer = setTimeout(() => {
-          new Notification("Nuovo Inizio", {
+          new Notification("Conoscermi", {
             body: "Non hai ancora fatto il check-in oggi. Prenditi un momento per te.",
             icon: "/favicon.ico"
           });
@@ -184,7 +184,7 @@ export default function App() {
   if (!user) {
     return (
       <div className="min-h-screen bg-surface flex flex-col items-center justify-center text-on-surface p-6">
-        <h1 className="text-4xl font-extrabold text-primary mb-2">Nuovo Inizio</h1>
+        <h1 className="text-4xl font-extrabold text-primary mb-2">Conoscermi</h1>
         <p className="text-on-surface-variant mb-8 text-center">Accedi per salvare i tuoi progressi e il tuo diario in modo sicuro.</p>
         
         {loginError && (
@@ -247,7 +247,7 @@ export default function App() {
       <div className="w-full max-w-[430px] relative min-h-screen pb-28">
         {!showSettings && (
           <TopBar 
-            title="Nuovo Inizio" 
+            title="Conoscermi" 
             onSettingsClick={() => setShowSettings(true)} 
           />
         )}

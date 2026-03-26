@@ -1,4 +1,5 @@
-import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell } from 'lucide-react';
+import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface SettingsProps {
   onBack: () => void;
@@ -7,6 +8,26 @@ interface SettingsProps {
 }
 
 export function Settings({ onBack, remindersEnabled, onToggleReminders }: SettingsProps) {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
   const handleToggle = async () => {
     if (!remindersEnabled && 'Notification' in window) {
       const permission = await Notification.requestPermission();
@@ -35,13 +56,32 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
 
       <section className="space-y-2">
         <p className="text-primary font-bold tracking-widest uppercase text-xs">Il tuo spazio</p>
-        <h2 className="text-3xl font-extrabold tracking-tight text-on-surface">Nuovo Inizio</h2>
+        <h2 className="text-3xl font-extrabold tracking-tight text-on-surface">Conoscermi</h2>
         <p className="text-on-surface-variant leading-relaxed">
           Personalizza il tuo percorso e gestisci i tuoi dati locali.
         </p>
       </section>
 
       <div className="grid grid-cols-1 gap-6">
+        {/* App Install */}
+        {deferredPrompt && (
+          <div className="bg-primary-container p-8 rounded-lg space-y-4">
+            <div className="flex items-center gap-3 text-on-primary-container">
+              <Smartphone size={24} />
+              <h3 className="font-bold text-lg">Installa App</h3>
+            </div>
+            <p className="text-sm text-on-primary-container/80 leading-relaxed">
+              Installa Conoscermi sul tuo dispositivo per un accesso più rapido e un'esperienza migliore.
+            </p>
+            <button 
+              onClick={handleInstallClick}
+              className="w-full bg-primary text-on-primary font-bold py-3 rounded-full hover:opacity-90 transition-opacity active:scale-95"
+            >
+              Installa Ora
+            </button>
+          </div>
+        )}
+
         {/* Notifications */}
         <div className="bg-surface-container p-8 rounded-lg space-y-6">
           <div className="flex items-center gap-3 text-primary">
@@ -136,7 +176,7 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
             <Leaf className="text-white" size={36} />
           </div>
           <div className="space-y-1">
-            <h4 className="font-black text-xl tracking-tight">Nuovo Inizio</h4>
+            <h4 className="font-black text-xl tracking-tight">Conoscermi</h4>
             <p className="text-sm font-medium text-on-surface-variant">Versione 1.0.0 (Aura Calma)</p>
           </div>
           <div className="pt-4 space-y-2">

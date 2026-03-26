@@ -22,7 +22,7 @@ service cloud.firestore {
     function isValidUserSettings() {
       return hasOnlyAllowedFields(['remindersEnabled', 'dismissedDate', 'uid']) &&
              (!('remindersEnabled' in request.resource.data) || request.resource.data.remindersEnabled is bool) &&
-             (!('dismissedDate' in request.resource.data) || request.resource.data.dismissedDate is string) &&
+             (!('dismissedDate' in request.resource.data) || request.resource.data.dismissedDate is string || request.resource.data.dismissedDate == null) &&
              (!('uid' in request.resource.data) || request.resource.data.uid is string);
     }
 
