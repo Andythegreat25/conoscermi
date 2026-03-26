@@ -10,6 +10,7 @@ import { Settings } from './components/Settings';
 import { ReminderBanner } from './components/ReminderBanner';
 import { PinLock } from './components/PinLock';
 import { SplashScreen } from './components/SplashScreen';
+import { QuickJournal } from './components/QuickJournal';
 import { DiaryEntry } from './types';
 import { Toaster, toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -64,6 +65,7 @@ export default function App() {
   
   const [currentTab, setCurrentTab] = useState<Tab>('home');
   const [showSettings, setShowSettings] = useState(false);
+  const [showQuickJournal, setShowQuickJournal] = useState(false);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [dismissedDate, setDismissedDate] = useState<string | null>(null);
@@ -187,6 +189,7 @@ export default function App() {
     const updatedEntries = [newEntry, ...entries];
     setEntries(updatedEntries);
     localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+    setShowQuickJournal(false);
     setCurrentTab('diary');
   };
 
@@ -227,6 +230,15 @@ export default function App() {
       );
     }
 
+    if (showQuickJournal) {
+      return (
+        <QuickJournal 
+          onBack={() => setShowQuickJournal(false)} 
+          onSave={handleSaveEntry} 
+        />
+      );
+    }
+
     switch (currentTab) {
       case 'home':
         return (
@@ -240,7 +252,7 @@ export default function App() {
       case 'checkin':
         return <CheckIn onSave={handleSaveEntry} />;
       case 'diary':
-        return <Diary entries={entries} onAddEntry={() => setCurrentTab('checkin')} />;
+        return <Diary entries={entries} onAddEntry={() => setShowQuickJournal(true)} />;
       case 'journey':
         return <Journey entries={entries} />;
       case 'motivations':
@@ -259,7 +271,7 @@ export default function App() {
     <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary-container selection:text-on-primary-container flex justify-center">
       <Toaster position="top-center" richColors />
       <div className="w-full max-w-[430px] relative min-h-screen pb-28">
-        {!showSettings && (
+        {!showSettings && !showQuickJournal && (
           <TopBar 
             title="Conoscermi" 
             onSettingsClick={() => setShowSettings(true)} 
@@ -267,7 +279,7 @@ export default function App() {
           />
         )}
         
-        {shouldShowBanner && (
+        {shouldShowBanner && !showQuickJournal && (
           <ReminderBanner 
             onClose={handleDismissReminder} 
             onClick={() => {
@@ -277,11 +289,11 @@ export default function App() {
           />
         )}
 
-        <main className={`px-6 ${showSettings ? 'pt-12' : 'pt-24'}`}>
+        <main className={`px-6 ${showSettings || showQuickJournal ? 'pt-12' : 'pt-24'}`}>
           {renderContent()}
         </main>
 
-        {!showSettings && (
+        {!showSettings && !showQuickJournal && (
           <BottomNav 
             currentTab={currentTab} 
             onTabChange={setCurrentTab} 
