@@ -5,7 +5,7 @@ import { Home } from './components/Home';
 import { CheckIn } from './components/CheckIn';
 import { Diary } from './components/Diary';
 import { Journey } from './components/Journey';
-import { Motivations } from './components/Motivations';
+import { Echoes } from './components/Echoes';
 import { Settings } from './components/Settings';
 import { ReminderBanner } from './components/ReminderBanner';
 import { PinLock } from './components/PinLock';
@@ -255,8 +255,8 @@ export default function App() {
         return <Diary entries={entries} onAddEntry={() => setShowQuickJournal(true)} />;
       case 'journey':
         return <Journey entries={entries} />;
-      case 'motivations':
-        return <Motivations />;
+      case 'echoes':
+        return <Echoes apiKey={process.env.GEMINI_API_KEY || ''} />;
       default:
         return <Home 
           onNavigateToDiary={() => setCurrentTab('diary')}

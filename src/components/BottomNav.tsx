@@ -1,6 +1,6 @@
-import { Home, Book, CheckCircle2, Sparkles, LineChart } from 'lucide-react';
+import { Home, Book, CheckCircle2, MessageCircle, LineChart } from 'lucide-react';
 
-export type Tab = 'home' | 'diary' | 'checkin' | 'motivations' | 'journey';
+export type Tab = 'home' | 'diary' | 'checkin' | 'echoes' | 'journey';
 
 interface BottomNavProps {
   currentTab: Tab;
@@ -12,8 +12,8 @@ export function BottomNav({ currentTab, onTabChange }: BottomNavProps) {
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'diary', icon: Book, label: 'Diario' },
     { id: 'checkin', icon: CheckCircle2, label: 'Check-in' },
-    { id: 'motivations', icon: Sparkles, label: 'Motivazioni' },
-    { id: 'journey', icon: LineChart, label: 'Statistiche' },
+    { id: 'echoes', icon: MessageCircle, label: 'Echi' },
+    { id: 'journey', icon: LineChart, label: 'Percorso' },
   ] as const;
 
   return (

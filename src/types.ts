@@ -9,3 +9,16 @@ export interface DiaryEntry {
   timestamp: number;
   uid: string;
 }
+
+export interface EchoMessage {
+  id: string;
+  role: 'user' | 'persona';
+  content: string;
+  timestamp: number;
+}
+
+export interface Persona {
+  name: string;
+  context: string; // The processed chat history/style
+  lastUpdated: number;
+}
