@@ -8,44 +8,12 @@ import { Journey } from './components/Journey';
 import { Motivations } from './components/Motivations';
 import { Settings } from './components/Settings';
 import { ReminderBanner } from './components/ReminderBanner';
+import { PinLock } from './components/PinLock';
 import { DiaryEntry } from './types';
-import { auth, db } from './firebase';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, setDoc, doc, getDoc } from 'firebase/firestore';
-
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
-}
-
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: any;
-}
-
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-    },
-    operationType,
-    path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-}
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [hasPin, setHasPin] = useState<boolean | null>(null);
   
   const [currentTab, setCurrentTab] = useState<Tab>('home');
   const [showSettings, setShowSettings] = useState(false);
@@ -53,84 +21,51 @@ export default function App() {
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [dismissedDate, setDismissedDate] = useState<string | null>(null);
 
+  // Check for existing PIN and load initial data
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsAuthReady(true);
-    });
-    return () => unsubscribe();
+    const savedPin = localStorage.getItem('user_pin');
+    setHasPin(!!savedPin);
+
+    const savedEntries = localStorage.getItem('diary_entries');
+    if (savedEntries) {
+      try {
+        setEntries(JSON.parse(savedEntries));
+      } catch (e) {
+        console.error("Failed to parse entries", e);
+      }
+    }
+
+    const savedSettings = localStorage.getItem('app_settings');
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        if (settings.remindersEnabled !== undefined) setRemindersEnabled(settings.remindersEnabled);
+        if (settings.dismissedDate !== undefined) setDismissedDate(settings.dismissedDate);
+      } catch (e) {
+        console.error("Failed to parse settings", e);
+      }
+    }
   }, []);
 
+  // Save entries to localStorage whenever they change
   useEffect(() => {
-    if (!isAuthReady || !user) return;
+    localStorage.setItem('diary_entries', JSON.stringify(entries));
+  }, [entries]);
 
-    const entriesRef = collection(db, `users/${user.uid}/entries`);
-    const q = query(entriesRef, orderBy('timestamp', 'desc'));
-    
-    const unsubscribeEntries = onSnapshot(q, (snapshot) => {
-      const loadedEntries: DiaryEntry[] = [];
-      snapshot.forEach((doc) => {
-        loadedEntries.push(doc.data() as DiaryEntry);
-      });
-      setEntries(loadedEntries);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/entries`);
-    });
-
-    const settingsRef = doc(db, `users/${user.uid}`);
-    const unsubscribeSettings = onSnapshot(settingsRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.remindersEnabled !== undefined) setRemindersEnabled(data.remindersEnabled);
-        if (data.dismissedDate !== undefined) setDismissedDate(data.dismissedDate);
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-    });
-
-    return () => {
-      unsubscribeEntries();
-      unsubscribeSettings();
-    };
-  }, [user, isAuthReady]);
-
-  const handleLogin = async () => {
-    setLoginError(null);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error: any) {
-      console.error("Login failed", error);
-      if (error.code === 'auth/popup-blocked') {
-        setLoginError("Il popup di accesso è stato bloccato dal browser. Clicca sull'icona 'Apri in una nuova scheda' in alto a destra, oppure consenti i popup per questo sito.");
-      } else {
-        setLoginError("Errore durante l'accesso. Riprova più tardi.");
-      }
-    }
-  };
-
-  const saveSettingsToFirestore = async (reminders: boolean, dismissed: string | null) => {
-    if (!user) return;
-    try {
-      await setDoc(doc(db, `users/${user.uid}`), {
-        remindersEnabled: reminders,
-        dismissedDate: dismissed,
-        uid: user.uid
-      }, { merge: true });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
-    }
+  const saveSettingsLocally = (reminders: boolean, dismissed: string | null) => {
+    const settings = { remindersEnabled: reminders, dismissedDate: dismissed };
+    localStorage.setItem('app_settings', JSON.stringify(settings));
   };
 
   const handleToggleReminders = (enabled: boolean) => {
     setRemindersEnabled(enabled);
-    saveSettingsToFirestore(enabled, dismissedDate);
+    saveSettingsLocally(enabled, dismissedDate);
   };
 
   const handleDismissReminder = () => {
     const todayStr = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
     setDismissedDate(todayStr);
-    saveSettingsToFirestore(remindersEnabled, todayStr);
+    saveSettingsLocally(remindersEnabled, todayStr);
   };
 
   const todayStr = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
@@ -153,9 +88,7 @@ export default function App() {
 
   const shouldShowBanner = remindersEnabled && !hasCheckedInToday && dismissedDate !== todayStr && currentTab !== 'checkin' && !showSettings;
 
-  const handleSaveEntry = async (newEntryData: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => {
-    if (!user) return;
-    
+  const handleSaveEntry = (newEntryData: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => {
     const now = new Date();
     const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
     const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
@@ -166,40 +99,32 @@ export default function App() {
       timestamp: now.getTime(),
       date: now.toLocaleDateString('it-IT', dateOpts).toUpperCase(),
       time: now.toLocaleTimeString('en-US', timeOpts),
-      uid: user.uid
+      uid: 'local-user'
     };
 
-    try {
-      await setDoc(doc(db, `users/${user.uid}/entries/${newEntry.id}`), newEntry);
-      setCurrentTab('diary');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/entries/${newEntry.id}`);
-    }
+    const updatedEntries = [newEntry, ...entries];
+    setEntries(updatedEntries);
+    localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+    setCurrentTab('diary');
   };
 
-  if (!isAuthReady) {
+  const handleLogout = () => {
+    setIsUnlocked(false);
+  };
+
+  if (hasPin === null) {
     return <div className="min-h-screen bg-surface flex items-center justify-center text-on-surface">Caricamento...</div>;
   }
 
-  if (!user) {
+  if (!isUnlocked) {
     return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center text-on-surface p-6">
-        <h1 className="text-4xl font-extrabold text-primary mb-2">Conoscermi</h1>
-        <p className="text-on-surface-variant mb-8 text-center">Accedi per salvare i tuoi progressi e il tuo diario in modo sicuro.</p>
-        
-        {loginError && (
-          <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-xl text-sm text-center border border-red-200">
-            {loginError}
-          </div>
-        )}
-
-        <button 
-          onClick={handleLogin}
-          className="bg-primary text-on-primary px-6 py-3 rounded-full font-bold shadow-sm active:scale-95 transition-transform"
-        >
-          Accedi con Google
-        </button>
-      </div>
+      <PinLock 
+        isSetup={!hasPin} 
+        onUnlock={() => {
+          setIsUnlocked(true);
+          setHasPin(true);
+        }} 
+      />
     );
   }
 
@@ -210,6 +135,7 @@ export default function App() {
           onBack={() => setShowSettings(false)} 
           remindersEnabled={remindersEnabled}
           onToggleReminders={handleToggleReminders}
+          onLogout={handleLogout}
         />
       );
     }
@@ -276,3 +202,4 @@ export default function App() {
     </div>
   );
 }
+

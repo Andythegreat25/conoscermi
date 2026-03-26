@@ -11,7 +11,7 @@ const MOODS: { id: Mood; emoji: string; label: string; desc: string }[] = [
 ];
 
 interface CheckInProps {
-  onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time'>) => void;
+  onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => void;
 }
 
 export function CheckIn({ onSave }: CheckInProps) {

@@ -1,14 +1,16 @@
-import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone } from 'lucide-react';
+import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface SettingsProps {
   onBack: () => void;
   remindersEnabled: boolean;
   onToggleReminders: (enabled: boolean) => void;
+  onLogout: () => void;
 }
 
-export function Settings({ onBack, remindersEnabled, onToggleReminders }: SettingsProps) {
+export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout }: SettingsProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [storageSize, setStorageSize] = useState('0 KB');
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -16,6 +18,13 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handler);
+    
+    // Calculate storage size
+    const entries = localStorage.getItem('diary_entries') || '';
+    const settings = localStorage.getItem('app_settings') || '';
+    const size = (entries.length + settings.length) / 1024;
+    setStorageSize(size > 1024 ? `${(size / 1024).toFixed(1)} MB` : `${size.toFixed(1)} KB`);
+
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
@@ -34,7 +43,6 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
       if (permission === 'granted') {
         onToggleReminders(true);
       } else {
-        // Fallback to in-app only if permission denied, but we still enable the in-app banner
         onToggleReminders(true);
       }
     } else {
@@ -42,16 +50,54 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
     }
   };
 
+  const handleExport = () => {
+    const entries = localStorage.getItem('diary_entries');
+    if (!entries) return;
+    const blob = new Blob([entries], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conoscermi-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearAll = () => {
+    if (confirm('Sei sicuro di voler cancellare tutti i dati? Questa azione è irreversibile.')) {
+      localStorage.removeItem('diary_entries');
+      localStorage.removeItem('app_settings');
+      window.location.reload();
+    }
+  };
+
+  const handleChangePin = () => {
+    if (confirm('Vuoi cambiare il tuo PIN? Verrai disconnesso per impostarne uno nuovo.')) {
+      localStorage.removeItem('user_pin');
+      window.location.reload();
+    }
+  };
+
   return (
-    <div className="animate-in fade-in slide-in-from-right-8 duration-300 space-y-10">
-      <div className="flex items-center gap-4 mb-8">
+    <div className="animate-in fade-in slide-in-from-right-8 duration-300 space-y-10 pb-12">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onBack}
+            className="p-2 -ml-2 text-primary hover:bg-surface-container/50 transition-colors active:scale-95 duration-200 rounded-full"
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <h2 className="text-2xl font-bold text-primary">Impostazioni</h2>
+        </div>
         <button 
-          onClick={onBack}
-          className="p-2 -ml-2 text-primary hover:bg-surface-container/50 transition-colors active:scale-95 duration-200 rounded-full"
+          onClick={onLogout}
+          className="flex items-center gap-2 bg-surface-container-high text-on-surface px-4 py-2 rounded-full text-sm font-bold hover:bg-surface-container-highest transition-colors active:scale-95"
         >
-          <ArrowLeft size={24} />
+          <Lock size={16} />
+          Blocca
         </button>
-        <h2 className="text-2xl font-bold text-primary">Impostazioni</h2>
       </div>
 
       <section className="space-y-2">
@@ -81,6 +127,21 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
             </button>
           </div>
         )}
+
+        {/* Security */}
+        <div className="bg-surface-container p-8 rounded-lg space-y-6">
+          <div className="flex items-center gap-3 text-primary">
+            <Key size={24} />
+            <h3 className="font-bold text-lg">Sicurezza</h3>
+          </div>
+          <button 
+            onClick={handleChangePin}
+            className="w-full flex items-center justify-between p-4 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-white transition-colors"
+          >
+            <span className="font-medium">Cambia PIN di accesso</span>
+            <ArrowLeft size={20} className="rotate-180 text-outline-variant" />
+          </button>
+        </div>
 
         {/* Notifications */}
         <div className="bg-surface-container p-8 rounded-lg space-y-6">
@@ -151,16 +212,22 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
             </div>
             <div className="bg-surface-container-highest px-6 py-4 rounded-2xl flex flex-col items-end">
               <span className="text-xs uppercase font-bold tracking-tighter text-on-surface-variant">Utilizzo</span>
-              <span className="text-2xl font-black text-primary">1.2 MB</span>
+              <span className="text-2xl font-black text-primary">{storageSize}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            <button className="flex items-center justify-center gap-3 bg-surface-container-highest text-primary font-bold py-4 px-6 rounded-full hover:bg-outline-variant/20 transition-all active:scale-95">
+            <button 
+              onClick={handleExport}
+              className="flex items-center justify-center gap-3 bg-surface-container-highest text-primary font-bold py-4 px-6 rounded-full hover:bg-outline-variant/20 transition-all active:scale-95"
+            >
               <Download size={20} />
               Esporta dati (JSON)
             </button>
-            <button className="flex items-center justify-center gap-3 bg-error-container text-error font-bold py-4 px-6 rounded-full hover:bg-error/10 transition-all active:scale-95">
+            <button 
+              onClick={handleClearAll}
+              className="flex items-center justify-center gap-3 bg-error-container text-error font-bold py-4 px-6 rounded-full hover:bg-error/10 transition-all active:scale-95"
+            >
               <Trash2 size={20} />
               Cancella tutto
             </button>
@@ -177,7 +244,7 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
           </div>
           <div className="space-y-1">
             <h4 className="font-black text-xl tracking-tight">Conoscermi</h4>
-            <p className="text-sm font-medium text-on-surface-variant">Versione 1.0.0 (Aura Calma)</p>
+            <p className="text-sm font-medium text-on-surface-variant">Versione 1.1.0 (Aura Calma)</p>
           </div>
           <div className="pt-4 space-y-2">
             <p className="text-primary italic font-medium">"Fatto con cura per il tuo percorso."</p>
@@ -187,3 +254,4 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders }: Settin
     </div>
   );
 }
+
