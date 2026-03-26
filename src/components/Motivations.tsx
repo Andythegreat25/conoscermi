@@ -36,12 +36,70 @@ const CATEGORY_MAP: Record<string, string> = {
 
 const ICONS = ['heart', 'zap', 'sparkles', 'leaf', 'sun', 'pin'];
 
+const FALLBACK_QUOTES: QuoteData[] = [
+  {
+    id: 'fb-1',
+    text: "La pace viene da dentro. Non cercarla fuori.",
+    author: "Buddha",
+    category: "Pace interiore",
+    icon: "leaf"
+  },
+  {
+    id: 'fb-2',
+    text: "Il successo non è definitivo, il fallimento non è fatale: è il coraggio di continuare che conta.",
+    author: "Winston Churchill",
+    category: "Coraggio",
+    icon: "zap"
+  },
+  {
+    id: 'fb-3',
+    text: "La felicità non è qualcosa di pronto. Viene dalle tue azioni.",
+    author: "Dalai Lama",
+    category: "Amore proprio",
+    icon: "heart"
+  },
+  {
+    id: 'fb-4',
+    text: "Sii il cambiamento che vuoi vedere nel mondo.",
+    author: "Mahatma Gandhi",
+    category: "Crescita",
+    icon: "sparkles"
+  },
+  {
+    id: 'fb-5',
+    text: "Tutto ciò che abbiamo è il presente.",
+    author: "Marco Aurelio",
+    category: "Consapevolezza",
+    icon: "sun"
+  },
+  {
+    id: 'fb-6',
+    text: "La pazienza è amara, ma il suo frutto è dolce.",
+    author: "Jean-Jacques Rousseau",
+    category: "Pazienza",
+    icon: "pin"
+  },
+  {
+    id: 'fb-7',
+    text: "Non è mai troppo tardi per essere ciò che avresti potuto essere.",
+    author: "George Eliot",
+    category: "Speranza",
+    icon: "sparkles"
+  },
+  {
+    id: 'fb-8',
+    text: "La forza non deriva dalla capacità fisica. Deriva da una volontà indomita.",
+    author: "Mahatma Gandhi",
+    category: "Forza",
+    icon: "zap"
+  }
+];
+
 export function Motivations() {
   const [activeCategory, setActiveCategory] = useState<string>('Tutte');
-  const [quotes, setQuotes] = useState<QuoteData[]>([]);
+  const [quotes, setQuotes] = useState<QuoteData[]>(FALLBACK_QUOTES);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Load favorites from localStorage
   useEffect(() => {
@@ -62,47 +120,43 @@ export function Motivations() {
 
   const fetchQuotes = async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      // Using type.fit API as it's reliable and CORS-friendly
-      const response = await fetch('https://type.fit/api/quotes');
-      if (!response.ok) throw new Error('Errore nel caricamento delle citazioni');
-      const data = await response.json();
+      const response = await fetch('https://type.fit/api/quotes').catch(() => null);
       
-      // Transform and categorize data
-      const transformed: QuoteData[] = data.slice(0, 100).map((q: any, index: number) => {
-        const text = q.text;
-        const author = q.author?.replace(', type.fit', '') || 'Anonimo';
+      if (response && response.ok) {
+        const data = await response.json();
         
-        // Simple categorization based on keywords
-        let category = 'Crescita';
-        if (text.toLowerCase().includes('peace') || text.toLowerCase().includes('calm')) category = 'Pace interiore';
-        else if (text.toLowerCase().includes('strength') || text.toLowerCase().includes('power')) category = 'Forza';
-        else if (text.toLowerCase().includes('wait') || text.toLowerCase().includes('patience')) category = 'Pazienza';
-        else if (text.toLowerCase().includes('fear') || text.toLowerCase().includes('courage')) category = 'Coraggio';
-        else if (text.toLowerCase().includes('mind') || text.toLowerCase().includes('present')) category = 'Consapevolezza';
-        else if (text.toLowerCase().includes('hope') || text.toLowerCase().includes('light')) category = 'Speranza';
-        else if (text.toLowerCase().includes('love') || text.toLowerCase().includes('self')) category = 'Amore proprio';
-        else {
-          // Randomly assign from our list if no keyword matches
-          const randomCats = CATEGORIES.slice(2);
-          category = randomCats[index % randomCats.length];
-        }
+        const transformed: QuoteData[] = data.slice(0, 100).map((q: any, index: number) => {
+          const text = q.text;
+          const author = q.author?.replace(', type.fit', '') || 'Anonimo';
+          
+          let category = 'Crescita';
+          if (text.toLowerCase().includes('peace') || text.toLowerCase().includes('calm')) category = 'Pace interiore';
+          else if (text.toLowerCase().includes('strength') || text.toLowerCase().includes('power')) category = 'Forza';
+          else if (text.toLowerCase().includes('wait') || text.toLowerCase().includes('patience')) category = 'Pazienza';
+          else if (text.toLowerCase().includes('fear') || text.toLowerCase().includes('courage')) category = 'Coraggio';
+          else if (text.toLowerCase().includes('mind') || text.toLowerCase().includes('present')) category = 'Consapevolezza';
+          else if (text.toLowerCase().includes('hope') || text.toLowerCase().includes('light')) category = 'Speranza';
+          else if (text.toLowerCase().includes('love') || text.toLowerCase().includes('self')) category = 'Amore proprio';
+          else {
+            const randomCats = CATEGORIES.slice(2);
+            category = randomCats[index % randomCats.length];
+          }
 
-        return {
-          id: `api-${index}`,
-          text,
-          author,
-          category,
-          icon: ICONS[index % ICONS.length],
-          image: index % 10 === 0 ? `https://picsum.photos/seed/quote-${index}/800/600` : undefined
-        };
-      });
+          return {
+            id: `api-${index}`,
+            text,
+            author,
+            category,
+            icon: ICONS[index % ICONS.length],
+            image: index % 10 === 0 ? `https://picsum.photos/seed/quote-${index}/800/600` : undefined
+          };
+        });
 
-      setQuotes(transformed);
+        setQuotes(transformed);
+      }
     } catch (err) {
-      console.error(err);
-      setError('Non è stato possibile caricare le citazioni esterne. Riprova più tardi.');
+      console.error("Failed to fetch quotes, using fallbacks", err);
     } finally {
       setIsLoading(false);
     }
@@ -159,31 +213,11 @@ export function Motivations() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && quotes.length === 0) {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
         <Loader2 className="text-primary animate-spin" size={40} />
         <p className="text-on-surface-variant font-medium">Caricamento saggezza...</p>
-      </div>
-    );
-  }
-
-  if (error && quotes.length === 0) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center space-y-6 p-6">
-        <div className="w-20 h-20 bg-error/10 rounded-full flex items-center justify-center text-error">
-          <RefreshCw size={40} />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-xl font-bold text-on-surface">Ops! Qualcosa è andato storto</h3>
-          <p className="text-on-surface-variant">{error}</p>
-        </div>
-        <button 
-          onClick={fetchQuotes}
-          className="bg-primary text-on-primary px-8 py-3 rounded-full font-bold shadow-sm active:scale-95 transition-transform"
-        >
-          Riprova
-        </button>
       </div>
     );
   }
