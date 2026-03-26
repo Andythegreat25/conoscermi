@@ -9,6 +9,7 @@ import { Motivations } from './components/Motivations';
 import { Settings } from './components/Settings';
 import { ReminderBanner } from './components/ReminderBanner';
 import { PinLock } from './components/PinLock';
+import { SplashScreen } from './components/SplashScreen';
 import { DiaryEntry } from './types';
 import { Toaster, toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -59,12 +60,15 @@ export default function App() {
 
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
   
   const [currentTab, setCurrentTab] = useState<Tab>('home');
   const [showSettings, setShowSettings] = useState(false);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [dismissedDate, setDismissedDate] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Check for existing PIN and load initial data
   useEffect(() => {
@@ -86,31 +90,64 @@ export default function App() {
         const settings = JSON.parse(savedSettings);
         if (settings.remindersEnabled !== undefined) setRemindersEnabled(settings.remindersEnabled);
         if (settings.dismissedDate !== undefined) setDismissedDate(settings.dismissedDate);
+        if (settings.theme) setTheme(settings.theme);
+        if (settings.avatarUrl) setAvatarUrl(settings.avatarUrl);
       } catch (e) {
         console.error("Failed to parse settings", e);
       }
     }
+
+    // Artificial delay for splash screen
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2500);
+
+    return () => clearTimeout(timer);
   }, []);
+
+  // Apply theme to document
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   // Save entries to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('diary_entries', JSON.stringify(entries));
   }, [entries]);
 
-  const saveSettingsLocally = (reminders: boolean, dismissed: string | null) => {
-    const settings = { remindersEnabled: reminders, dismissedDate: dismissed };
+  const saveSettingsLocally = (reminders: boolean, dismissed: string | null, currentTheme: 'light' | 'dark', currentAvatar: string | null) => {
+    const settings = { 
+      remindersEnabled: reminders, 
+      dismissedDate: dismissed,
+      theme: currentTheme,
+      avatarUrl: currentAvatar
+    };
     localStorage.setItem('app_settings', JSON.stringify(settings));
   };
 
   const handleToggleReminders = (enabled: boolean) => {
     setRemindersEnabled(enabled);
-    saveSettingsLocally(enabled, dismissedDate);
+    saveSettingsLocally(enabled, dismissedDate, theme, avatarUrl);
+  };
+
+  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+    setTheme(newTheme);
+    saveSettingsLocally(remindersEnabled, dismissedDate, newTheme, avatarUrl);
+  };
+
+  const handleAvatarChange = (newAvatar: string | null) => {
+    setAvatarUrl(newAvatar);
+    saveSettingsLocally(remindersEnabled, dismissedDate, theme, newAvatar);
   };
 
   const handleDismissReminder = () => {
     const todayStr = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
     setDismissedDate(todayStr);
-    saveSettingsLocally(remindersEnabled, todayStr);
+    saveSettingsLocally(remindersEnabled, todayStr, theme, avatarUrl);
   };
 
   const todayStr = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
@@ -157,8 +194,8 @@ export default function App() {
     setIsUnlocked(false);
   };
 
-  if (hasPin === null) {
-    return <div className="min-h-screen bg-surface flex items-center justify-center text-on-surface">Caricamento...</div>;
+  if (showSplash || hasPin === null) {
+    return <SplashScreen />;
   }
 
   if (!isUnlocked) {
@@ -182,6 +219,10 @@ export default function App() {
           onToggleReminders={handleToggleReminders}
           onLogout={handleLogout}
           onCheckUpdates={() => updateServiceWorker(true)}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          avatarUrl={avatarUrl}
+          onAvatarChange={handleAvatarChange}
         />
       );
     }
@@ -222,6 +263,7 @@ export default function App() {
           <TopBar 
             title="Conoscermi" 
             onSettingsClick={() => setShowSettings(true)} 
+            avatarUrl={avatarUrl}
           />
         )}
         

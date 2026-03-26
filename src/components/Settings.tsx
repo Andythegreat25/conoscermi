@@ -1,5 +1,5 @@
-import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw, Camera, User } from 'lucide-react';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
 
 interface SettingsProps {
   onBack: () => void;
@@ -7,11 +7,26 @@ interface SettingsProps {
   onToggleReminders: (enabled: boolean) => void;
   onLogout: () => void;
   onCheckUpdates: () => void;
+  theme: 'light' | 'dark';
+  onThemeChange: (theme: 'light' | 'dark') => void;
+  avatarUrl: string | null;
+  onAvatarChange: (url: string | null) => void;
 }
 
-export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout, onCheckUpdates }: SettingsProps) {
+export function Settings({ 
+  onBack, 
+  remindersEnabled, 
+  onToggleReminders, 
+  onLogout, 
+  onCheckUpdates,
+  theme,
+  onThemeChange,
+  avatarUrl,
+  onAvatarChange
+}: SettingsProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [storageSize, setStorageSize] = useState('0 KB');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -80,6 +95,23 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout
     }
   };
 
+  const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        onAvatarChange(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const triggerAvatarUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const defaultAvatar = "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150&h=150";
+
   return (
     <div className="animate-in fade-in slide-in-from-right-8 duration-300 space-y-10 pb-12">
       <div className="flex items-center justify-between mb-8">
@@ -103,10 +135,36 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout
 
       <section className="space-y-2">
         <p className="text-primary font-bold tracking-widest uppercase text-xs">Il tuo spazio</p>
-        <h2 className="text-3xl font-extrabold tracking-tight text-on-surface">Conoscermi</h2>
-        <p className="text-on-surface-variant leading-relaxed">
-          Personalizza il tuo percorso e gestisci i tuoi dati locali.
-        </p>
+        <div className="flex items-center gap-6">
+          <div className="relative group">
+            <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-primary/20 bg-surface-container-highest shrink-0">
+              <img 
+                src={avatarUrl || defaultAvatar} 
+                alt="Profile" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <button 
+              onClick={triggerAvatarUpload}
+              className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+            >
+              <Camera size={16} />
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleAvatarUpload} 
+              accept="image/*" 
+              className="hidden" 
+            />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-3xl font-extrabold tracking-tight text-on-surface">Conoscermi</h2>
+            <p className="text-on-surface-variant leading-relaxed">
+              Personalizza il tuo percorso e gestisci i tuoi dati locali.
+            </p>
+          </div>
+        </div>
       </section>
 
       <div className="grid grid-cols-1 gap-6">
@@ -171,13 +229,31 @@ export function Settings({ onBack, remindersEnabled, onToggleReminders, onLogout
             <h3 className="font-bold text-lg">Aspetto</h3>
           </div>
           <div className="space-y-3">
-            <button className="w-full flex items-center justify-between p-4 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-white transition-colors">
+            <button 
+              onClick={() => onThemeChange('light')}
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
+                theme === 'light' 
+                  ? 'bg-surface-container-lowest text-on-surface border-2 border-primary shadow-sm' 
+                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest/50'
+              }`}
+            >
               <span className="font-medium">Tema Chiaro</span>
-              <div className="w-5 h-5 rounded-full border-4 border-primary bg-white"></div>
+              <div className={`w-5 h-5 rounded-full border-2 ${theme === 'light' ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
+                {theme === 'light' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full"></div></div>}
+              </div>
             </button>
-            <button className="w-full flex items-center justify-between p-4 rounded-xl bg-surface-container-low text-on-surface-variant hover:bg-white transition-colors opacity-80">
+            <button 
+              onClick={() => onThemeChange('dark')}
+              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
+                theme === 'dark' 
+                  ? 'bg-surface-container-lowest text-on-surface border-2 border-primary shadow-sm' 
+                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest/50'
+              }`}
+            >
               <span className="font-medium">Tema Scuro</span>
-              <div className="w-5 h-5 rounded-full border-2 border-outline-variant"></div>
+              <div className={`w-5 h-5 rounded-full border-2 ${theme === 'dark' ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
+                {theme === 'dark' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full"></div></div>}
+              </div>
             </button>
           </div>
         </div>
