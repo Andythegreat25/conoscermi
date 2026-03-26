@@ -1,4 +1,4 @@
-import { Heart, Zap, Sparkles, Leaf, Sun, Pin, Quote, RefreshCw, Loader2, Star } from 'lucide-react';
+import { Heart, Zap, Sparkles, Leaf, Sun, Pin, Quote, RefreshCw, Loader2, Star, X } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 
 interface QuoteData {
@@ -95,7 +95,11 @@ const FALLBACK_QUOTES: QuoteData[] = [
   }
 ];
 
-export function Motivations() {
+interface MotivationsProps {
+  onClose?: () => void;
+}
+
+export function Motivations({ onClose }: MotivationsProps) {
   const [activeCategory, setActiveCategory] = useState<string>('Tutte');
   const [quotes, setQuotes] = useState<QuoteData[]>(FALLBACK_QUOTES);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -226,11 +230,21 @@ export function Motivations() {
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
-      <section className="mb-8">
-        <h2 className="text-4xl font-extrabold tracking-tight text-primary mb-2">Motivazioni</h2>
-        <p className="text-on-surface-variant font-medium leading-relaxed">
-          Trova la tua forza interiore attraverso parole di saggezza e pace.
-        </p>
+      <section className="mb-8 flex justify-between items-start">
+        <div>
+          <h2 className="text-4xl font-extrabold tracking-tight text-primary mb-2">Motivazioni</h2>
+          <p className="text-on-surface-variant font-medium leading-relaxed">
+            Trova la tua forza interiore attraverso parole di saggezza e pace.
+          </p>
+        </div>
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+          >
+            <X size={24} />
+          </button>
+        )}
       </section>
 
       <div className="flex gap-3 overflow-x-auto hide-scrollbar mb-8 -mx-6 px-6">

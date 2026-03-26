@@ -6,6 +6,7 @@ import { CheckIn } from './components/CheckIn';
 import { Diary } from './components/Diary';
 import { Journey } from './components/Journey';
 import { Echoes } from './components/Echoes';
+import { Motivations } from './components/Motivations';
 import { Settings } from './components/Settings';
 import { ReminderBanner } from './components/ReminderBanner';
 import { PinLock } from './components/PinLock';
@@ -65,6 +66,7 @@ export default function App() {
   
   const [currentTab, setCurrentTab] = useState<Tab>('home');
   const [showSettings, setShowSettings] = useState(false);
+  const [showMotivations, setShowMotivations] = useState(false);
   const [showQuickJournal, setShowQuickJournal] = useState(false);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
@@ -239,12 +241,21 @@ export default function App() {
       );
     }
 
+    if (showMotivations) {
+      return (
+        <Motivations 
+          onClose={() => setShowMotivations(false)} 
+        />
+      );
+    }
+
     switch (currentTab) {
       case 'home':
         return (
           <Home 
             onNavigateToDiary={() => setCurrentTab('diary')}
             onNavigateToCheckIn={() => setCurrentTab('checkin')}
+            onMotivationsClick={() => setShowMotivations(true)}
             lastMood={entries[0]?.mood}
             entries={entries}
           />
@@ -261,6 +272,7 @@ export default function App() {
         return <Home 
           onNavigateToDiary={() => setCurrentTab('diary')}
           onNavigateToCheckIn={() => setCurrentTab('checkin')}
+          onMotivationsClick={() => setShowMotivations(true)}
           lastMood={entries[0]?.mood}
           entries={entries}
         />;
@@ -271,10 +283,11 @@ export default function App() {
     <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary-container selection:text-on-primary-container flex justify-center">
       <Toaster position="top-center" richColors />
       <div className="w-full max-w-[430px] relative min-h-screen pb-28">
-        {!showSettings && !showQuickJournal && (
+        {!showSettings && !showQuickJournal && !showMotivations && (
           <TopBar 
             title="Conoscermi" 
             onSettingsClick={() => setShowSettings(true)} 
+            onMotivationsClick={() => setShowMotivations(true)}
             avatarUrl={avatarUrl}
           />
         )}
@@ -289,11 +302,11 @@ export default function App() {
           />
         )}
 
-        <main className={`px-6 ${showSettings || showQuickJournal ? 'pt-12' : 'pt-24'}`}>
+        <main className={`px-6 ${showSettings || showQuickJournal || showMotivations ? 'pt-12' : 'pt-24'}`}>
           {renderContent()}
         </main>
 
-        {!showSettings && !showQuickJournal && (
+        {!showSettings && !showQuickJournal && !showMotivations && (
           <BottomNav 
             currentTab={currentTab} 
             onTabChange={setCurrentTab} 

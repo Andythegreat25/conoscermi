@@ -111,16 +111,21 @@ export function Echoes({ apiKey }: EchoesProps) {
   };
 
   const handleSendMessage = async () => {
-    console.log("Attempting to send message...");
-    if (!input.trim() || !persona) {
-      console.log("Missing input or persona", { input: !!input.trim(), persona: !!persona });
-      return;
-    }
+    if (!input.trim() || !persona) return;
 
-    if (!apiKey) {
-      console.log("Missing API Key");
+    // Use prop if provided, otherwise try global process.env
+    let envKey = '';
+    try {
+      envKey = process.env.GEMINI_API_KEY || '';
+    } catch (e) {
+      // Silent fail for env access
+    }
+    
+    const effectiveApiKey = apiKey || envKey;
+
+    if (!effectiveApiKey) {
       toast.error("Configurazione mancante", {
-        description: "L'API Key di Gemini non è stata trovata. Controlla le impostazioni dell'app."
+        description: "L'API Key di Gemini non è stata trovata. Assicurati che sia configurata correttamente nell'ambiente."
       });
       return;
     }
@@ -140,7 +145,6 @@ export function Echoes({ apiKey }: EchoesProps) {
       timestamp: Date.now()
     };
 
-    console.log("Adding user message to state...");
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
@@ -148,8 +152,7 @@ export function Echoes({ apiKey }: EchoesProps) {
     const toastId = toast.loading("L'eco sta scrivendo...");
 
     try {
-      console.log("Calling Gemini API...");
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [
@@ -177,7 +180,6 @@ export function Echoes({ apiKey }: EchoesProps) {
         }
       });
 
-      console.log("Gemini response received");
       const personaMsg: EchoMessage = {
         id: generateId(),
         role: 'persona',

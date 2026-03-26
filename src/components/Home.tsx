@@ -4,11 +4,12 @@ import { Mood, DiaryEntry } from '../types';
 interface HomeProps {
   onNavigateToDiary: () => void;
   onNavigateToCheckIn: () => void;
+  onMotivationsClick: () => void;
   lastMood?: Mood;
   entries: DiaryEntry[];
 }
 
-export function Home({ onNavigateToDiary, onNavigateToCheckIn, lastMood, entries }: HomeProps) {
+export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClick, lastMood, entries }: HomeProps) {
   const quotes = [
     "Ogni giorno è un piccolo passo verso una nuova te.",
     "La tua crescita è un viaggio, non una destinazione.",
@@ -125,15 +126,18 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, lastMood, entries
       </section>
 
       {/* Daily Quote Card */}
-      <section className="bg-surface-container-low rounded-lg p-8 relative overflow-hidden">
-        <div className="absolute -top-4 -left-4 opacity-10">
+      <section 
+        onClick={onMotivationsClick}
+        className="bg-surface-container-low rounded-lg p-8 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:bg-surface-container-high group"
+      >
+        <div className="absolute -top-4 -left-4 opacity-10 group-hover:opacity-20 transition-opacity">
           <Quote size={80} className="text-on-surface-variant fill-current" />
         </div>
         <div className="relative z-10">
           <p className="text-on-surface-variant font-body text-xl leading-relaxed italic text-center">
             "{dailyQuote}"
           </p>
-          <div className="w-12 h-1 bg-primary-container/40 mx-auto mt-6 rounded-full"></div>
+          <div className="w-12 h-1 bg-primary-container/40 mx-auto mt-6 rounded-full group-hover:w-20 transition-all"></div>
         </div>
       </section>
 
