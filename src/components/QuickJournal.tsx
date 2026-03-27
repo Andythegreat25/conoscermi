@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, PenSquare, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, PenSquare, Sparkles, CheckCircle2, Lightbulb } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
 
 const MOODS: { id: Mood; emoji: string; label: string }[] = [
@@ -10,18 +10,44 @@ const MOODS: { id: Mood; emoji: string; label: string }[] = [
   { id: 'Forte', emoji: '✨', label: 'Forte' },
 ];
 
+const PROMPTS = [
+  "Qual è stata la cosa migliore di oggi?",
+  "Cosa ti ha preoccupato e come l'hai affrontato?",
+  "Per cosa ti senti grato in questo momento?",
+  "Cosa hai imparato di nuovo oggi?",
+  "Chi ti ha fatto sorridere oggi e perché?",
+  "Qual è un piccolo successo che hai ottenuto oggi?",
+  "Se potessi cambiare una cosa di oggi, cosa sarebbe?",
+  "Cosa non vedi l'ora di fare domani?",
+  "Descrivi un momento in cui ti sei sentito in pace oggi.",
+  "Quale canzone o musica ha accompagnato la tua giornata?",
+  "Cosa ti ha fatto arrabbiare oggi? Come hai reagito?",
+  "Hai dedicato del tempo a te stesso oggi? Cosa hai fatto?",
+  "Cosa ti sta trattenendo in questo periodo?",
+  "Qual è un tuo pregio che hai dimostrato oggi?",
+  "Se la tua giornata fosse un film, che titolo avrebbe?"
+];
+
 interface QuickJournalProps {
   onSave: (entry: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => void;
   onBack: () => void;
+  initialEntry?: DiaryEntry | null;
 }
 
-export function QuickJournal({ onSave, onBack }: QuickJournalProps) {
-  const [note, setNote] = useState('');
-  const [selectedMood, setSelectedMood] = useState<Mood>('Neutro');
+export function QuickJournal({ onSave, onBack, initialEntry }: QuickJournalProps) {
+  const [note, setNote] = useState(initialEntry?.note || '');
+  const [selectedMood, setSelectedMood] = useState<Mood>(initialEntry?.mood || 'Neutro');
+  const [currentPrompt, setCurrentPrompt] = useState<string | null>(null);
 
   const handleSave = () => {
     if (!note.trim()) return;
     onSave({ mood: selectedMood, note });
+  };
+
+  const handleInspireMe = () => {
+    const randomPrompt = PROMPTS[Math.floor(Math.random() * PROMPTS.length)];
+    setCurrentPrompt(randomPrompt);
+    // If the note is empty, we can optionally pre-fill it or just show the prompt above
   };
 
   return (
@@ -34,16 +60,36 @@ export function QuickJournal({ onSave, onBack }: QuickJournalProps) {
           <ArrowLeft size={20} />
         </button>
         <div className="flex-1 text-center pr-10">
-          <p className="text-primary font-bold tracking-widest uppercase text-[10px]">Nuovo Pensiero</p>
-          <h2 className="text-xl font-extrabold text-on-surface">Scrivi nel Diario</h2>
+          <p className="text-primary font-bold tracking-widest uppercase text-[10px]">
+            {initialEntry ? "Modifica Pensiero" : "Nuovo Pensiero"}
+          </p>
+          <h2 className="text-xl font-extrabold text-on-surface">
+            {initialEntry ? "Modifica nel Diario" : "Scrivi nel Diario"}
+          </h2>
         </div>
       </header>
 
       <section className="space-y-4">
-        <div className="flex items-center gap-2 text-primary">
-          <PenSquare size={20} />
-          <h3 className="font-bold">Cosa hai in mente?</h3>
+        <div className="flex items-center justify-between text-primary">
+          <div className="flex items-center gap-2">
+            <PenSquare size={20} />
+            <h3 className="font-bold">Cosa hai in mente?</h3>
+          </div>
+          <button 
+            onClick={handleInspireMe}
+            className="flex items-center gap-1.5 text-xs font-bold bg-secondary-container text-on-secondary-container px-3 py-1.5 rounded-full hover:opacity-90 transition-opacity active:scale-95"
+          >
+            <Lightbulb size={14} className="fill-current" />
+            Ispirami
+          </button>
         </div>
+        
+        {currentPrompt && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 animate-in fade-in slide-in-from-top-2">
+            <p className="text-sm font-medium text-primary italic">"{currentPrompt}"</p>
+          </div>
+        )}
+
         <textarea
           autoFocus
           value={note}
@@ -86,7 +132,7 @@ export function QuickJournal({ onSave, onBack }: QuickJournalProps) {
           className="w-full h-14 rounded-full bg-gradient-to-br from-primary to-primary-container text-white font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100"
         >
           <CheckCircle2 size={22} />
-          Salva nel diario
+          {initialEntry ? "Salva Modifiche" : "Salva nel diario"}
         </button>
       </section>
     </div>

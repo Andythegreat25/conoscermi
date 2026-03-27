@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { TopBar } from './components/TopBar';
 import { BottomNav, Tab } from './components/BottomNav';
 import { Home } from './components/Home';
@@ -64,10 +65,14 @@ export default function App() {
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   
-  const [currentTab, setCurrentTab] = useState<Tab>('home');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentTab = (location.pathname === '/' ? 'home' : location.pathname.substring(1)) as Tab;
+
   const [showSettings, setShowSettings] = useState(false);
   const [showMotivations, setShowMotivations] = useState(false);
   const [showQuickJournal, setShowQuickJournal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [dismissedDate, setDismissedDate] = useState<string | null>(null);
@@ -175,24 +180,35 @@ export default function App() {
   const shouldShowBanner = remindersEnabled && !hasCheckedInToday && dismissedDate !== todayStr && currentTab !== 'checkin' && !showSettings;
 
   const handleSaveEntry = (newEntryData: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => {
-    const now = new Date();
-    const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
-    const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
-    
-    const newEntry: DiaryEntry = {
-      ...newEntryData,
-      id: crypto.randomUUID(),
-      timestamp: now.getTime(),
-      date: now.toLocaleDateString('it-IT', dateOpts).toUpperCase(),
-      time: now.toLocaleTimeString('it-IT', timeOpts),
-      uid: 'local-user'
-    };
+    if (editingEntry) {
+      const updatedEntries = entries.map(e => 
+        e.id === editingEntry.id 
+          ? { ...e, mood: newEntryData.mood, note: newEntryData.note } 
+          : e
+      );
+      setEntries(updatedEntries);
+      localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+      setEditingEntry(null);
+    } else {
+      const now = new Date();
+      const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+      const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+      
+      const newEntry: DiaryEntry = {
+        ...newEntryData,
+        id: crypto.randomUUID(),
+        timestamp: now.getTime(),
+        date: now.toLocaleDateString('it-IT', dateOpts).toUpperCase(),
+        time: now.toLocaleTimeString('it-IT', timeOpts),
+        uid: 'local-user'
+      };
 
-    const updatedEntries = [newEntry, ...entries];
-    setEntries(updatedEntries);
-    localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+      const updatedEntries = [newEntry, ...entries];
+      setEntries(updatedEntries);
+      localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+    }
     setShowQuickJournal(false);
-    setCurrentTab('diary');
+    navigate('/diary');
   };
 
   const handleLogout = () => {
@@ -235,8 +251,12 @@ export default function App() {
     if (showQuickJournal) {
       return (
         <QuickJournal 
-          onBack={() => setShowQuickJournal(false)} 
+          onBack={() => {
+            setShowQuickJournal(false);
+            setEditingEntry(null);
+          }} 
           onSave={handleSaveEntry} 
+          initialEntry={editingEntry}
         />
       );
     }
@@ -249,34 +269,37 @@ export default function App() {
       );
     }
 
-    switch (currentTab) {
-      case 'home':
-        return (
+    return (
+      <Routes>
+        <Route path="/" element={
           <Home 
-            onNavigateToDiary={() => setCurrentTab('diary')}
-            onNavigateToCheckIn={() => setCurrentTab('checkin')}
+            onNavigateToDiary={() => navigate('/diary')}
+            onNavigateToCheckIn={() => navigate('/checkin')}
             onMotivationsClick={() => setShowMotivations(true)}
             lastMood={entries[0]?.mood}
             entries={entries}
           />
-        );
-      case 'checkin':
-        return <CheckIn onSave={handleSaveEntry} />;
-      case 'diary':
-        return <Diary entries={entries} onAddEntry={() => setShowQuickJournal(true)} />;
-      case 'journey':
-        return <Journey entries={entries} />;
-      case 'echoes':
-        return <Echoes apiKey={process.env.GEMINI_API_KEY || ''} />;
-      default:
-        return <Home 
-          onNavigateToDiary={() => setCurrentTab('diary')}
-          onNavigateToCheckIn={() => setCurrentTab('checkin')}
-          onMotivationsClick={() => setShowMotivations(true)}
-          lastMood={entries[0]?.mood}
-          entries={entries}
-        />;
-    }
+        } />
+        <Route path="/home" element={<Navigate to="/" replace />} />
+        <Route path="/checkin" element={<CheckIn onSave={handleSaveEntry} />} />
+        <Route path="/diary" element={
+          <Diary 
+            entries={entries} 
+            onAddEntry={() => {
+              setEditingEntry(null);
+              setShowQuickJournal(true);
+            }} 
+            onEditEntry={(entry) => {
+              setEditingEntry(entry);
+              setShowQuickJournal(true);
+            }}
+          />
+        } />
+        <Route path="/journey" element={<Journey entries={entries} />} />
+        <Route path="/echoes" element={<Echoes apiKey={process.env.GEMINI_API_KEY || ''} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   };
 
   return (
@@ -296,7 +319,7 @@ export default function App() {
           <ReminderBanner 
             onClose={handleDismissReminder} 
             onClick={() => {
-              setCurrentTab('checkin');
+              navigate('/checkin');
               handleDismissReminder();
             }} 
           />
@@ -309,7 +332,7 @@ export default function App() {
         {!showSettings && !showQuickJournal && !showMotivations && (
           <BottomNav 
             currentTab={currentTab} 
-            onTabChange={setCurrentTab} 
+            onTabChange={(tab) => navigate(tab === 'home' ? '/' : `/${tab}`)} 
           />
         )}
       </div>

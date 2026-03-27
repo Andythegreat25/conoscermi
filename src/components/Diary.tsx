@@ -1,15 +1,16 @@
-import { Search, MoreHorizontal, Plus, Filter, X } from 'lucide-react';
+import { Search, MoreHorizontal, Plus, Filter, X, Edit2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { DiaryEntry, Mood } from '../types';
 
 interface DiaryProps {
   entries: DiaryEntry[];
   onAddEntry: () => void;
+  onEditEntry: (entry: DiaryEntry) => void;
 }
 
 const MOODS: Mood[] = ['Forte', 'Meglio', 'Neutro', 'Arrabbiato', 'Difficile'];
 
-export function Diary({ entries, onAddEntry }: DiaryProps) {
+export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMood, setSelectedMood] = useState<Mood | 'Tutti'>('Tutti');
 
@@ -133,9 +134,15 @@ export function Diary({ entries, onAddEntry }: DiaryProps) {
                         <span className="text-xs font-bold uppercase tracking-widest text-secondary">{entry.mood}</span>
                         <span className="text-xs text-on-surface-variant/60 font-medium">{entry.time}</span>
                       </div>
-                      <button className="text-outline-variant hover:text-primary transition-colors">
-                        <MoreHorizontal size={20} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => onEditEntry(entry)}
+                          className="p-1.5 text-outline-variant hover:text-primary hover:bg-surface-container-highest rounded-full transition-all"
+                          title="Modifica"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-on-surface leading-snug">
                       {entry.note || "Nessuna nota aggiunta."}
