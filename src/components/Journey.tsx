@@ -7,9 +7,23 @@ interface JourneyProps {
 
 export function Journey({ entries }: JourneyProps) {
   // Calculate total days since first entry
-  const totalDays = entries.length > 0 
-    ? Math.max(1, Math.ceil((new Date().getTime() - entries[entries.length - 1].timestamp) / (1000 * 60 * 60 * 24)))
-    : 0;
+  const calculateTotalDays = () => {
+    if (!entries || entries.length === 0) return 0;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // entries are sorted newest first, so the last element is the oldest
+    const firstDate = new Date(entries[entries.length - 1].timestamp);
+    firstDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = today.getTime() - firstDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays + 1; // Day 1 is the first day
+  };
+
+  const totalDays = calculateTotalDays();
 
   const totalEntries = entries.length;
 
@@ -82,9 +96,9 @@ export function Journey({ entries }: JourneyProps) {
       if (dayEntries.length > 0) {
         // Average score for the day
         const avgScore = dayEntries.reduce((acc, curr) => acc + moodScores[curr.mood], 0) / dayEntries.length;
-        data.push(avgScore);
+        data.push({ score: avgScore, date: dateStr, isToday: i === 0 });
       } else {
-        data.push(0); // No entry
+        data.push({ score: 0, date: dateStr, isToday: i === 0 }); // No entry
       }
     }
     return data;
@@ -152,14 +166,15 @@ export function Journey({ entries }: JourneyProps) {
       <section className="space-y-4">
         <h3 className="text-sm font-bold uppercase tracking-[0.15em] text-on-surface-variant px-1">Tendenza Umore (Ultimi 14 gg)</h3>
         <div className="bg-surface-container-low p-6 rounded-lg h-48 flex items-end justify-between gap-2">
-          {trendData.map((height, i) => (
+          {trendData.map((item, i) => (
             <div 
               key={i} 
+              title={item.date}
               className={`flex-1 rounded-t-full transition-all duration-1000 ${
-                i === 13 ? 'bg-secondary border-t-4 border-secondary-container' : 
-                height > 0 ? (height >= 80 ? 'bg-primary/40' : 'bg-secondary/40') : 'bg-surface-container-highest/20'
+                item.isToday ? 'bg-secondary border-t-4 border-secondary-container' : 
+                item.score > 0 ? (item.score >= 80 ? 'bg-primary/40' : 'bg-secondary/40') : 'bg-surface-container-highest/20'
               }`}
-              style={{ height: `${Math.max(height, 5)}%`, opacity: i === 13 ? 1 : (height > 0 ? (height / 100) * 0.8 + 0.2 : 0.3) }}
+              style={{ height: `${Math.max(item.score, 5)}%`, opacity: item.isToday ? 1 : (item.score > 0 ? (item.score / 100) * 0.8 + 0.2 : 0.3) }}
             ></div>
           ))}
         </div>
