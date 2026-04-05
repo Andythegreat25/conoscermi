@@ -1,6 +1,6 @@
 import { PenSquare, Heart, Flame, Leaf, Award, Star, Sparkles, Trophy, Gem } from 'lucide-react';
 import { DiaryEntry, Mood } from '../types';
-import { calculateStreak } from '../utils/streak';
+import { calculateStreak, calculateMaxStreak } from '../utils/streak';
 
 interface JourneyProps {
   entries: DiaryEntry[];
@@ -35,12 +35,13 @@ export function Journey({ entries }: JourneyProps) {
   const totalDays = calculateTotalDays();
   const totalEntries = entries.length;
   const streak = calculateStreak(entries);
+  const maxStreak = calculateMaxStreak(entries);
 
   // Calculate "Sentita meglio" percentage
   const positiveMoods = entries.filter(e => e.mood === 'Meglio' || e.mood === 'Forte').length;
   const betterPercentage = totalEntries > 0 ? Math.round((positiveMoods / totalEntries) * 100) : 0;
 
-  // Next milestone to reach
+  // Next milestone to reach (based on current streak to keep motivation)
   const nextMilestone = MILESTONES.find(m => m.days > streak);
   const daysToNext = nextMilestone ? nextMilestone.days - streak : null;
 
@@ -113,6 +114,9 @@ export function Journey({ entries }: JourneyProps) {
           <div>
             <div className="text-2xl font-bold text-on-surface">{streak}</div>
             <div className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Giorni di fila</div>
+            {maxStreak > streak && (
+              <div className="text-[10px] text-secondary/70 font-bold mt-0.5">Record: {maxStreak}</div>
+            )}
           </div>
         </div>
 
@@ -174,8 +178,8 @@ export function Journey({ entries }: JourneyProps) {
         <h3 className="text-sm font-bold uppercase tracking-[0.15em] text-on-surface-variant px-1">Traguardi</h3>
         <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-2 -mx-6 px-6">
           {MILESTONES.map(({ days, label, Icon, gradient }) => {
-            const unlocked = streak >= days;
-            const isNext = nextMilestone?.days === days;
+            const unlocked = maxStreak >= days; // usa il record storico: i badge non si perdono mai
+            const isNext = !unlocked && nextMilestone?.days === days;
             return (
               <div
                 key={days}

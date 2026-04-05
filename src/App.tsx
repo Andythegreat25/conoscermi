@@ -19,6 +19,7 @@ import { Toaster, toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw } from 'lucide-react';
 import { saveReminderSettings, saveCheckinDate } from './utils/db';
+import { hasCheckedInToday } from './utils/streak';
 
 export default function App() {
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
@@ -233,7 +234,7 @@ export default function App() {
   };
 
   const todayStr = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
-  const hasCheckedInToday = entries.some(e => e.date === todayStr);
+  const checkedInToday = hasCheckedInToday(entries);
 
   // Today's evening note (from the most recent entry of today)
   const todayEveningNote = entries.find(e => e.date === todayStr)?.eveningNote;
@@ -251,7 +252,7 @@ export default function App() {
         type: 'UPDATE_REMINDER',
         enabled,
         hour,
-        checkedInToday: hasCheckedInToday,
+        checkedInToday: checkedInToday,
         eveningEnabled,
         eveningHour,
       });
@@ -279,14 +280,14 @@ export default function App() {
   // Sync reminder state with SW whenever relevant state changes
   useEffect(() => {
     sendReminderStateToSW(remindersEnabled, reminderHour, eveningReminderEnabled, eveningReminderHour);
-  }, [remindersEnabled, reminderHour, eveningReminderEnabled, eveningReminderHour, hasCheckedInToday]);
+  }, [remindersEnabled, reminderHour, eveningReminderEnabled, eveningReminderHour, checkedInToday]);
 
   // Register periodic sync once on mount
   useEffect(() => {
     registerPeriodicSync();
   }, []);
 
-  const shouldShowBanner = remindersEnabled && !hasCheckedInToday && dismissedDate !== todayStr && currentTab !== 'checkin' && !showSettings;
+  const shouldShowBanner = remindersEnabled && !checkedInToday && dismissedDate !== todayStr && currentTab !== 'checkin' && !showSettings;
 
   const handleSaveEntry = (newEntryData: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => {
     if (editingEntry) {
@@ -354,6 +355,7 @@ export default function App() {
         note: '',
         uid: 'local-user',
         eveningNote: note,
+        eveningNoteOnly: true, // non conta per lo streak
       };
       updatedEntries = [newEntry, ...entries];
     }

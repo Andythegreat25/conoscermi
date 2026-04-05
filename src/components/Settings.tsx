@@ -1,4 +1,4 @@
-import { Palette, Cloud, Database, Download, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw, Camera, FileText, Moon } from 'lucide-react';
+import { Palette, Cloud, Database, Download, Upload, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw, Camera, FileText, Moon } from 'lucide-react';
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { toast } from 'sonner';
 import { DiaryEntry } from '../types';
@@ -52,6 +52,7 @@ export function Settings({
   const [storageBreakdown, setStorageBreakdown] = useState<StorageBreakdown | null>(null);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -216,6 +217,34 @@ export function Settings({
     } finally {
       setIsExportingPDF(false);
     }
+  };
+
+  const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      try {
+        const imported: DiaryEntry[] = JSON.parse(reader.result as string);
+        if (!Array.isArray(imported)) throw new Error('Formato non valido');
+        // Merge: keep existing entries, add only those not already present (by id)
+        const existing: DiaryEntry[] = JSON.parse(localStorage.getItem('diary_entries') || '[]');
+        const existingIds = new Set(existing.map(e => e.id));
+        const newEntries = imported.filter(e => !existingIds.has(e.id));
+        const merged = [...existing, ...newEntries].sort((a, b) => b.timestamp - a.timestamp);
+        localStorage.setItem('diary_entries', JSON.stringify(merged));
+        toast.success(`Importate ${newEntries.length} nuove voci ✓`, {
+          description: newEntries.length === 0 ? 'Tutte le voci erano già presenti.' : undefined,
+        });
+        // Reset the input so the same file can be selected again
+        e.target.value = '';
+        setTimeout(() => window.location.reload(), 1200);
+      } catch {
+        toast.error('File non valido. Assicurati di usare un backup esportato da Conoscermi.');
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleClearAll = () => {
@@ -534,6 +563,20 @@ export function Settings({
               <Download size={20} />
               Esporta dati (JSON)
             </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              className="flex items-center justify-center gap-3 bg-surface-container-highest text-primary font-bold py-4 px-6 rounded-full hover:bg-outline-variant/20 transition-all active:scale-95"
+            >
+              <Upload size={20} />
+              Importa backup (JSON)
+            </button>
+            <input
+              type="file"
+              ref={importInputRef}
+              onChange={handleImport}
+              accept="application/json,.json"
+              className="hidden"
+            />
             <button
               onClick={handleClearAll}
               className="flex items-center justify-center gap-3 bg-error-container text-error font-bold py-4 px-6 rounded-full hover:bg-error/10 transition-all active:scale-95"

@@ -8,7 +8,8 @@ export interface DiaryEntry {
   note: string;
   timestamp: number;
   uid: string;
-  eveningNote?: string; // nota di riflessione serale opzionale
+  eveningNote?: string;    // nota di riflessione serale opzionale
+  eveningNoteOnly?: boolean; // true = creata solo per la nota serale, NON conta per lo streak
 }
 
 export interface EchoMessage {
