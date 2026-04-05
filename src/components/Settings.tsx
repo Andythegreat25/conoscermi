@@ -23,6 +23,7 @@ interface SettingsProps {
   onEveningReminderHourChange: (hour: number) => void;
   onLogout: () => void;
   onCheckUpdates: () => void;
+  isCheckingUpdates?: boolean;
   theme: 'light' | 'dark';
   onThemeChange: (theme: 'light' | 'dark') => void;
   avatarUrl: string | null;
@@ -41,6 +42,7 @@ export function Settings({
   onEveningReminderHourChange,
   onLogout,
   onCheckUpdates,
+  isCheckingUpdates = false,
   theme,
   onThemeChange,
   avatarUrl,
@@ -463,10 +465,11 @@ export function Settings({
             </p>
             <button
               onClick={onCheckUpdates}
-              className="w-full flex items-center justify-center gap-2 bg-secondary text-on-secondary font-bold py-3 rounded-full hover:opacity-90 transition-opacity active:scale-95 text-sm"
+              disabled={isCheckingUpdates}
+              className="w-full flex items-center justify-center gap-2 bg-secondary text-on-secondary font-bold py-3 rounded-full hover:opacity-90 transition-opacity active:scale-95 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <RefreshCw size={16} />
-              Controlla aggiornamenti
+              <RefreshCw size={16} className={isCheckingUpdates ? 'animate-spin' : ''} />
+              {isCheckingUpdates ? 'Controllo in corso…' : 'Controlla aggiornamenti'}
             </button>
           </div>
         </div>

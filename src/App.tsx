@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { TopBar } from './components/TopBar';
 import { BottomNav, Tab } from './components/BottomNav';
@@ -21,6 +21,9 @@ import { RefreshCw } from 'lucide-react';
 import { saveReminderSettings, saveCheckinDate } from './utils/db';
 
 export default function App() {
+  const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const needRefreshRef = useRef(false);
+
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -28,12 +31,18 @@ export default function App() {
   } = useRegisterSW({
     onRegistered(r) {
       if (r) {
+        swRegistrationRef.current = r;
         setInterval(() => {
           r.update();
         }, 15 * 60 * 1000);
       }
     },
   });
+
+  // Keep ref in sync so handleCheckUpdates can read the latest value
+  useEffect(() => {
+    needRefreshRef.current = needRefresh;
+  }, [needRefresh]);
 
   useEffect(() => {
     if (offlineReady) {
@@ -62,6 +71,30 @@ export default function App() {
       });
     }
   }, [needRefresh, setNeedRefresh, updateServiceWorker]);
+
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+
+  const handleCheckUpdates = async () => {
+    setIsCheckingUpdates(true);
+    const toastId = toast.loading('Ricerca aggiornamenti in corso…');
+    try {
+      if (swRegistrationRef.current) {
+        await swRegistrationRef.current.update();
+      }
+      // Wait up to 2 s for the SW update event to fire and set needRefresh
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      toast.dismiss(toastId);
+      if (!needRefreshRef.current) {
+        toast.success('App già aggiornata ✓');
+      }
+      // If needRefresh became true, the existing useEffect shows the "Ricarica" toast
+    } catch {
+      toast.dismiss(toastId);
+      toast.error('Impossibile verificare gli aggiornamenti');
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  };
 
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
@@ -365,7 +398,8 @@ export default function App() {
           eveningReminderHour={eveningReminderHour}
           onEveningReminderHourChange={handleEveningReminderHourChange}
           onLogout={handleLogout}
-          onCheckUpdates={() => updateServiceWorker(true)}
+          onCheckUpdates={handleCheckUpdates}
+          isCheckingUpdates={isCheckingUpdates}
           theme={theme}
           onThemeChange={handleThemeChange}
           avatarUrl={avatarUrl}
