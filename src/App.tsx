@@ -85,10 +85,13 @@ export default function App() {
       // Wait up to 2 s for the SW update event to fire and set needRefresh
       await new Promise(resolve => setTimeout(resolve, 2000));
       toast.dismiss(toastId);
-      if (!needRefreshRef.current) {
+      if (needRefreshRef.current) {
+        // Nuovo SW trovato → attivalo subito e ricarica (stesso comportamento del vecchio bottone)
+        toast.loading('Aggiornamento in corso…');
+        updateServiceWorker(true);
+      } else {
         toast.success('App già aggiornata ✓');
       }
-      // If needRefresh became true, the existing useEffect shows the "Ricarica" toast
     } catch {
       toast.dismiss(toastId);
       toast.error('Impossibile verificare gli aggiornamenti');
