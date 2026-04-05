@@ -11,7 +11,13 @@ precacheAndRoute(self.__WB_MANIFEST);
 let reminderEnabled = false;
 let reminderHour = 9;
 let scheduledTimer: ReturnType<typeof setTimeout> | null = null;
-let notifiedToday = '';   // "YYYY-MM-DD" of the last day a notification was shown
+let notifiedToday = '';   // "YYYY-MM-DD" of the last day a morning notification was shown
+
+// Evening reminder state
+let eveningReminderEnabled = false;
+let eveningReminderHour = 21;
+let eveningScheduledTimer: ReturnType<typeof setTimeout> | null = null;
+let eveningNotifiedToday = '';   // "YYYY-MM-DD" of the last day an evening notification was shown
 
 // ---------------------------------------------------------------------------
 // Helper: today's date as "YYYY-MM-DD" (local time)
@@ -58,7 +64,7 @@ async function getReminderSettings(): Promise<{ enabled: boolean; hour: number }
 }
 
 // ---------------------------------------------------------------------------
-// Core: decide whether to show the notification
+// Core: decide whether to show the morning notification
 // ---------------------------------------------------------------------------
 async function maybeNotify(): Promise<void> {
   const settings = await getReminderSettings();
@@ -84,7 +90,29 @@ async function maybeNotify(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Schedule a setTimeout for the next reminder time (fires while SW is alive)
+// Core: decide whether to show the evening notification
+// ---------------------------------------------------------------------------
+async function maybeNotifyEvening(): Promise<void> {
+  if (!eveningReminderEnabled) return;
+
+  const today = todayKey();
+  if (eveningNotifiedToday === today) return;   // Already notified today
+
+  const now = new Date();
+  if (now.getHours() < eveningReminderHour) return;   // Too early
+
+  eveningNotifiedToday = today;
+  await self.registration.showNotification('Conoscermi', {
+    body: 'Com\'è andata oggi? Prenditi un momento per riflettere. 🌙',
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    tag: 'evening-reminder',
+    renotify: false,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Schedule a setTimeout for the next morning reminder (fires while SW is alive)
 // ---------------------------------------------------------------------------
 function scheduleTimer(hour: number, checkedInToday: boolean): void {
   if (scheduledTimer !== null) {
@@ -110,6 +138,31 @@ function scheduleTimer(hour: number, checkedInToday: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
+// Schedule a setTimeout for the next evening reminder (fires while SW is alive)
+// ---------------------------------------------------------------------------
+function scheduleEveningTimer(hour: number): void {
+  if (eveningScheduledTimer !== null) {
+    clearTimeout(eveningScheduledTimer);
+    eveningScheduledTimer = null;
+  }
+
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(hour, 0, 0, 0);
+
+  let msUntil = target.getTime() - now.getTime();
+  if (msUntil < 0) {
+    // Already past today's hour – schedule for tomorrow
+    target.setDate(target.getDate() + 1);
+    msUntil = target.getTime() - now.getTime();
+  }
+
+  eveningScheduledTimer = setTimeout(() => {
+    maybeNotifyEvening();
+  }, msUntil);
+}
+
+// ---------------------------------------------------------------------------
 // Message handler – receives state from the React app
 // ---------------------------------------------------------------------------
 self.addEventListener('message', (event: ExtendableMessageEvent) => {
@@ -118,13 +171,24 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
 
   reminderEnabled = data.enabled ?? false;
   reminderHour = data.hour ?? 9;
+  eveningReminderEnabled = data.eveningEnabled ?? false;
+  eveningReminderHour = data.eveningHour ?? 21;
   const checkedInToday: boolean = data.checkedInToday ?? false;
 
+  // Morning reminder
   if (reminderEnabled) {
     scheduleTimer(reminderHour, checkedInToday);
   } else if (scheduledTimer !== null) {
     clearTimeout(scheduledTimer);
     scheduledTimer = null;
+  }
+
+  // Evening reminder
+  if (eveningReminderEnabled) {
+    scheduleEveningTimer(eveningReminderHour);
+  } else if (eveningScheduledTimer !== null) {
+    clearTimeout(eveningScheduledTimer);
+    eveningScheduledTimer = null;
   }
 });
 
@@ -135,6 +199,9 @@ self.addEventListener('periodicsync', (event: Event) => {
   const syncEvent = event as ExtendableEvent & { tag: string };
   if (syncEvent.tag === 'checkin-reminder') {
     syncEvent.waitUntil(maybeNotify());
+  }
+  if (syncEvent.tag === 'evening-reminder') {
+    syncEvent.waitUntil(maybeNotifyEvening());
   }
 });
 

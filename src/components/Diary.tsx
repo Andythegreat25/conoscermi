@@ -1,5 +1,6 @@
-import { Search, MoreHorizontal, Plus, Filter, X, Edit2 } from 'lucide-react';
+import { Search, Plus, Filter, X, Edit2, Moon } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { DiaryEntry, Mood } from '../types';
 
 interface DiaryProps {
@@ -16,8 +17,9 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
 
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
-      const matchesSearch = entry.note?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           entry.mood.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = entry.note?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           entry.mood.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           entry.eveningNote?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesMood = selectedMood === 'Tutti' || entry.mood === selectedMood;
       return matchesSearch && matchesMood;
     });
@@ -57,15 +59,15 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
           <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
             <Search className="text-outline" size={20} />
           </div>
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-14 pl-12 pr-12 bg-surface-container-highest border-none rounded-full focus:ring-0 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-on-surface"
             placeholder="Cerca nei tuoi pensieri..."
           />
           {searchQuery && (
-            <button 
+            <button
               onClick={() => setSearchQuery('')}
               className="absolute inset-y-0 right-4 flex items-center text-outline hover:text-primary transition-colors"
             >
@@ -78,8 +80,8 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
           <button
             onClick={() => setSelectedMood('Tutti')}
             className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-              selectedMood === 'Tutti' 
-                ? 'bg-primary text-white shadow-md' 
+              selectedMood === 'Tutti'
+                ? 'bg-primary text-white shadow-md'
                 : 'bg-surface-container-highest text-on-surface-variant'
             }`}
           >
@@ -90,8 +92,8 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
               key={mood}
               onClick={() => setSelectedMood(mood)}
               className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-                selectedMood === mood 
-                  ? `${getMoodColor(mood)} text-white shadow-md` 
+                selectedMood === mood
+                  ? `${getMoodColor(mood)} text-white shadow-md`
                   : 'bg-surface-container-highest text-on-surface-variant'
               }`}
             >
@@ -110,7 +112,7 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
             <Filter className="mx-auto mb-4 opacity-20" size={48} />
             <p className="font-medium">Nessun pensiero trovato per questa ricerca.</p>
             {(searchQuery || selectedMood !== 'Tutti') && (
-              <button 
+              <button
                 onClick={() => { setSearchQuery(''); setSelectedMood('Tutti'); }}
                 className="mt-4 text-primary font-bold text-sm underline underline-offset-4"
               >
@@ -124,32 +126,55 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
               <div className="relative pl-10 py-2 bg-surface z-10">
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-outline">{date}</span>
               </div>
-              
-              {dayEntries.map((entry) => (
-                <div key={entry.id} className="relative pl-10 z-10 group mb-6 last:mb-0">
-                  <div className={`absolute left-[13px] top-1 w-2.5 h-2.5 rounded-full ${getMoodColor(entry.mood)} ring-4 ring-surface`}></div>
-                  <div className="bg-surface-container rounded-lg p-5 transition-all hover:bg-surface-container-high">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold uppercase tracking-widest text-secondary">{entry.mood}</span>
-                        <span className="text-xs text-on-surface-variant/60 font-medium">{entry.time}</span>
+
+              {/* ── #15 Animazioni entry con AnimatePresence ─────────────── */}
+              <AnimatePresence initial={false}>
+                {dayEntries.map((entry, i) => (
+                  <motion.div
+                    key={entry.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -24 }}
+                    transition={{ duration: 0.22, delay: i * 0.05 }}
+                    className="relative pl-10 z-10 group mb-6 last:mb-0"
+                  >
+                    <div className={`absolute left-[13px] top-1 w-2.5 h-2.5 rounded-full ${getMoodColor(entry.mood)} ring-4 ring-surface`}></div>
+                    <div className="bg-surface-container rounded-lg p-5 transition-all hover:bg-surface-container-high">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold uppercase tracking-widest text-secondary">{entry.mood}</span>
+                          <span className="text-xs text-on-surface-variant/60 font-medium">{entry.time}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onEditEntry(entry)}
+                            className="p-1.5 text-outline-variant hover:text-primary hover:bg-surface-container-highest rounded-full transition-all"
+                            title="Modifica"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => onEditEntry(entry)}
-                          className="p-1.5 text-outline-variant hover:text-primary hover:bg-surface-container-highest rounded-full transition-all"
-                          title="Modifica"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                      </div>
+                      <p className="text-on-surface leading-snug">
+                        {entry.note || "Nessuna nota aggiunta."}
+                      </p>
+
+                      {/* ── #22 Evening note display ─────────────────────── */}
+                      {entry.eveningNote && (
+                        <div className="mt-3 pt-3 border-t border-outline-variant/20">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Moon size={12} className="text-tertiary" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-tertiary">Sera</span>
+                          </div>
+                          <p className="text-on-surface/80 leading-snug text-sm italic">
+                            {entry.eveningNote}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-on-surface leading-snug">
-                      {entry.note || "Nessuna nota aggiunta."}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           ))
         )}
@@ -157,7 +182,7 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
 
       {/* Floating Action Button (FAB) */}
       <div className="fixed bottom-28 left-0 right-0 w-full max-w-[430px] mx-auto z-40 pointer-events-none flex justify-end px-6">
-        <button 
+        <button
           onClick={onAddEntry}
           className="pointer-events-auto w-14 h-14 bg-gradient-to-br from-primary to-primary-container text-white rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform"
         >

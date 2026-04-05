@@ -1,4 +1,4 @@
-import { PenSquare, Heart, Flame, Leaf, Moon, User, Award, Star, Lock } from 'lucide-react';
+import { PenSquare, Heart, Flame, Leaf, Award, Star, Sparkles, Trophy, Gem } from 'lucide-react';
 import { DiaryEntry, Mood } from '../types';
 import { calculateStreak } from '../utils/streak';
 
@@ -6,33 +6,43 @@ interface JourneyProps {
   entries: DiaryEntry[];
 }
 
+const MILESTONES = [
+  { days: 7,   label: '7 Giorni',   Icon: Award,    gradient: 'from-secondary to-tertiary',               textColor: 'text-white' },
+  { days: 30,  label: '30 Giorni',  Icon: Star,     gradient: 'from-primary to-primary-container',         textColor: 'text-white' },
+  { days: 90,  label: '90 Giorni',  Icon: Flame,    gradient: 'from-secondary to-primary-container',       textColor: 'text-white' },
+  { days: 180, label: '180 Giorni', Icon: Gem,      gradient: 'from-tertiary to-secondary',                textColor: 'text-white' },
+  { days: 365, label: '1 Anno',     Icon: Trophy,   gradient: 'from-primary to-tertiary',                  textColor: 'text-white' },
+];
+
 export function Journey({ entries }: JourneyProps) {
   // Calculate total days since first entry
   const calculateTotalDays = () => {
     if (!entries || entries.length === 0) return 0;
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // entries are sorted newest first, so the last element is the oldest
     const firstDate = new Date(entries[entries.length - 1].timestamp);
     firstDate.setHours(0, 0, 0, 0);
-    
+
     const diffTime = today.getTime() - firstDate.getTime();
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    
+
     return diffDays + 1; // Day 1 is the first day
   };
 
   const totalDays = calculateTotalDays();
-
   const totalEntries = entries.length;
-
   const streak = calculateStreak(entries);
 
   // Calculate "Sentita meglio" percentage
   const positiveMoods = entries.filter(e => e.mood === 'Meglio' || e.mood === 'Forte').length;
   const betterPercentage = totalEntries > 0 ? Math.round((positiveMoods / totalEntries) * 100) : 0;
+
+  // Next milestone to reach
+  const nextMilestone = MILESTONES.find(m => m.days > streak);
+  const daysToNext = nextMilestone ? nextMilestone.days - streak : null;
 
   // Calculate trend data for the last 14 days
   const getTrendData = () => {
@@ -51,15 +61,15 @@ export function Journey({ entries }: JourneyProps) {
     for (let i = 13; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
-      
-      const dayEntries = entries.filter(e => e.date === dateStr);
+      const start = new Date(d); start.setHours(0, 0, 0, 0);
+      const end = new Date(d);   end.setHours(23, 59, 59, 999);
+
+      const dayEntries = entries.filter(e => e.timestamp >= start.getTime() && e.timestamp <= end.getTime());
       if (dayEntries.length > 0) {
-        // Average score for the day
         const avgScore = dayEntries.reduce((acc, curr) => acc + moodScores[curr.mood], 0) / dayEntries.length;
-        data.push({ score: avgScore, date: dateStr, isToday: i === 0 });
+        data.push({ score: avgScore, isToday: i === 0 });
       } else {
-        data.push({ score: 0, date: dateStr, isToday: i === 0 }); // No entry
+        data.push({ score: 0, isToday: i === 0 });
       }
     }
     return data;
@@ -78,10 +88,10 @@ export function Journey({ entries }: JourneyProps) {
       <section className="relative overflow-hidden bg-surface-container-low p-8 rounded-lg flex flex-col items-center justify-center text-center">
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary/5 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-secondary/5 rounded-full blur-2xl"></div>
-        
+
         <span className="text-8xl font-extrabold text-primary tracking-tighter leading-none mb-2">{totalDays}</span>
         <span className="text-sm font-bold text-on-surface-variant uppercase tracking-[0.2em]">Giorni di Rinascita</span>
-        
+
         <div className="mt-6 flex items-center gap-2 px-4 py-2 bg-secondary-container text-on-secondary-container rounded-full text-xs font-bold uppercase tracking-wider">
           <Leaf size={14} className="fill-current" />
           {streak > 0 ? "Sei in un momento di crescita" : "Inizia il tuo percorso oggi"}
@@ -97,7 +107,7 @@ export function Journey({ entries }: JourneyProps) {
             <div className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Pensieri scritti</div>
           </div>
         </div>
-        
+
         <div className="bg-secondary-container/30 p-5 rounded-lg flex flex-col justify-between aspect-square border border-secondary/10">
           <Flame className="text-secondary fill-current" size={28} />
           <div>
@@ -128,11 +138,10 @@ export function Journey({ entries }: JourneyProps) {
         <h3 className="text-sm font-bold uppercase tracking-[0.15em] text-on-surface-variant px-1">Tendenza Umore (Ultimi 14 gg)</h3>
         <div className="bg-surface-container-low p-6 rounded-lg h-48 flex items-end justify-between gap-2">
           {trendData.map((item, i) => (
-            <div 
-              key={i} 
-              title={item.date}
+            <div
+              key={i}
               className={`flex-1 rounded-t-full transition-all duration-1000 ${
-                item.isToday ? 'bg-secondary border-t-4 border-secondary-container' : 
+                item.isToday ? 'bg-secondary border-t-4 border-secondary-container' :
                 item.score > 0 ? (item.score >= 80 ? 'bg-primary/40' : 'bg-secondary/40') : 'bg-surface-container-highest/20'
               }`}
               style={{ height: `${Math.max(item.score, 5)}%`, opacity: item.isToday ? 1 : (item.score > 0 ? (item.score / 100) * 0.8 + 0.2 : 0.3) }}
@@ -141,38 +150,60 @@ export function Journey({ entries }: JourneyProps) {
         </div>
       </section>
 
+      {/* Next Milestone Banner */}
+      {nextMilestone && streak > 0 && (
+        <section className="bg-primary-container/20 border border-primary/10 rounded-lg p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <nextMilestone.Icon size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold uppercase tracking-widest text-primary/70">Prossimo traguardo</p>
+            <p className="font-bold text-on-surface">{nextMilestone.label}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <span className="text-2xl font-extrabold text-primary">{daysToNext}</span>
+            <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+              {daysToNext === 1 ? 'giorno' : 'giorni'}
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* Milestones Section */}
       <section className="space-y-4">
-        <h3 className="text-sm font-bold uppercase tracking-[0.15em] text-on-surface-variant px-1">Traguardi Raggiunti</h3>
+        <h3 className="text-sm font-bold uppercase tracking-[0.15em] text-on-surface-variant px-1">Traguardi</h3>
         <div className="flex gap-4 overflow-x-auto hide-scrollbar pb-2 -mx-6 px-6">
-          
-          <div className={`flex-shrink-0 w-32 ${streak >= 7 ? 'bg-surface-container-lowest border-secondary-container' : 'bg-surface-container-highest opacity-60 grayscale'} p-6 rounded-lg text-center flex flex-col items-center gap-3 shadow-sm border`}>
-            <div className={`w-12 h-12 ${streak >= 7 ? 'bg-gradient-to-br from-secondary to-tertiary text-white' : 'bg-on-surface-variant/10 text-on-surface-variant'} rounded-full flex items-center justify-center`}>
-              <Award className={streak >= 7 ? "fill-current" : ""} size={24} />
-            </div>
-            <span className="text-sm font-bold text-on-surface">7 Giorni</span>
-          </div>
-
-          <div className={`flex-shrink-0 w-32 ${streak >= 30 ? 'bg-gradient-to-br from-primary to-primary-container shadow-md scale-105 mx-1' : 'bg-surface-container-highest opacity-60 grayscale'} p-6 rounded-lg text-center flex flex-col items-center gap-3`}>
-            <div className={`w-12 h-12 ${streak >= 30 ? 'bg-white/20 text-white backdrop-blur-md' : 'bg-on-surface-variant/10 text-on-surface-variant'} rounded-full flex items-center justify-center`}>
-              <Star className={streak >= 30 ? "fill-current" : ""} size={24} />
-            </div>
-            <span className={`text-sm font-bold ${streak >= 30 ? 'text-white' : 'text-on-surface'} leading-tight`}>
-              30 Giorni
-              {streak < 30 && streak >= 7 && <><br/><span className="text-[10px] font-medium opacity-80">PROSSIMO</span></>}
-            </span>
-          </div>
-
-          <div className={`flex-shrink-0 w-32 ${streak >= 90 ? 'bg-gradient-to-br from-secondary to-primary-container shadow-md scale-105 mx-1' : 'bg-surface-container-highest opacity-60 grayscale'} p-6 rounded-lg text-center flex flex-col items-center gap-3`}>
-            <div className={`w-12 h-12 ${streak >= 90 ? 'bg-white/20 text-white backdrop-blur-md' : 'bg-on-surface-variant/10 text-on-surface-variant'} rounded-full flex items-center justify-center`}>
-              <Lock size={24} />
-            </div>
-            <span className={`text-sm font-bold ${streak >= 90 ? 'text-white' : 'text-on-surface'} leading-tight`}>
-              90 Giorni
-              {streak < 90 && streak >= 30 && <><br/><span className="text-[10px] font-medium opacity-80">PROSSIMO</span></>}
-            </span>
-          </div>
-
+          {MILESTONES.map(({ days, label, Icon, gradient }) => {
+            const unlocked = streak >= days;
+            const isNext = nextMilestone?.days === days;
+            return (
+              <div
+                key={days}
+                className={`flex-shrink-0 w-32 p-6 rounded-lg text-center flex flex-col items-center gap-3 transition-all ${
+                  unlocked
+                    ? `bg-gradient-to-br ${gradient} shadow-md scale-105 mx-1`
+                    : isNext
+                      ? 'bg-surface-container-lowest border-2 border-primary/30'
+                      : 'bg-surface-container-highest opacity-50 grayscale'
+                }`}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  unlocked ? 'bg-white/20 text-white backdrop-blur-md' : 'bg-on-surface-variant/10 text-on-surface-variant'
+                }`}>
+                  <Icon className={unlocked ? 'fill-current' : ''} size={24} />
+                </div>
+                <span className={`text-sm font-bold leading-tight ${unlocked ? 'text-white' : 'text-on-surface'}`}>
+                  {label}
+                  {isNext && !unlocked && (
+                    <><br /><span className="text-[10px] font-medium opacity-70">PROSSIMO</span></>
+                  )}
+                  {unlocked && (
+                    <><br /><span className="text-[10px] font-medium opacity-80">✓ RAGGIUNTO</span></>
+                  )}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

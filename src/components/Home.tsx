@@ -1,4 +1,4 @@
-import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Sparkles, AlertCircle } from 'lucide-react';
+import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Moon, AlertCircle } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
 import { useMemo } from 'react';
 import { calculateStreak, hasCheckedInToday } from '../utils/streak';
@@ -9,9 +9,21 @@ interface HomeProps {
   onMotivationsClick: () => void;
   lastMood?: Mood;
   entries: DiaryEntry[];
+  eveningReminderEnabled?: boolean;
+  onOpenEveningNote?: () => void;
+  todayEveningNote?: string;
 }
 
-export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClick, lastMood, entries }: HomeProps) {
+export function Home({
+  onNavigateToDiary,
+  onNavigateToCheckIn,
+  onMotivationsClick,
+  lastMood,
+  entries,
+  eveningReminderEnabled,
+  onOpenEveningNote,
+  todayEveningNote
+}: HomeProps) {
   const quotes = [
     "Ogni giorno è un piccolo passo verso una nuova te.",
     "La tua crescita è un viaggio, non una destinazione.",
@@ -27,32 +39,30 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
 
   const getDailyQuote = () => {
     const today = new Date();
-    // Use the day of the year or just the date to pick a quote
     const index = (today.getFullYear() + today.getMonth() + today.getDate()) % quotes.length;
     return quotes[index];
   };
 
   const dailyQuote = getDailyQuote();
 
-  // Time Capsule Logic
+  // ── #5 Time Capsule — usa timestamp invece della stringa date ──────────────
   const timeCapsuleEntry = useMemo(() => {
     if (!entries || entries.length === 0) return null;
-    
+
     const now = new Date();
     now.setHours(0, 0, 0, 0);
-    
-    // Check for 1 month ago (approx 30 days) or 1 year ago (365 days)
-    const checkIntervals = [30, 365];
-    
-    for (const days of checkIntervals) {
+
+    for (const days of [30, 365]) {
       const targetDate = new Date(now);
       targetDate.setDate(targetDate.getDate() - days);
-      const targetDateStr = targetDate.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
-      
-      const entry = entries.find(e => e.date === targetDateStr);
+
+      const start = new Date(targetDate); start.setHours(0, 0, 0, 0);
+      const end   = new Date(targetDate); end.setHours(23, 59, 59, 999);
+
+      const entry = entries.find(e => e.timestamp >= start.getTime() && e.timestamp <= end.getTime());
       if (entry) return { entry, daysAgo: days };
     }
-    
+
     return null;
   }, [entries]);
 
@@ -61,10 +71,31 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
   const totalEntries = entries.length;
   const lastEntryTime = entries[0]?.time || '--:--';
 
-  // Calculate progress circle dashoffset (max 690)
-  // Let's make the circle complete at 30 days
-  const progressPercentage = Math.min(streak / 30, 1);
+  // ── #12 Progress circle dinamico — scala al prossimo milestone ────────────
+  function getProgressMilestone(s: number): number {
+    if (s < 30)  return 30;
+    if (s < 90)  return 90;
+    if (s < 365) return 365;
+    return s; // oltre 365: il cerchio rimane pieno (traguardo raggiunto)
+  }
+  const progressMax = getProgressMilestone(streak);
+  const progressPercentage = Math.min(streak / progressMax, 1);
   const strokeDashoffset = 690 - (690 * progressPercentage);
+
+  // ── #2 Micro-label contestuale per lo streak ──────────────────────────────
+  const streakLabel = (() => {
+    if (streak === 0) return "Inizia oggi! 🌱";
+    if (!checkedInToday) return "check-in per continuare!";
+    if (streak === 1 && totalEntries <= 1) return "Primo giorno! 🌱";
+    if (streak === 1 && totalEntries > 1) return "Ripartita oggi 💪";
+    return "ce la stai facendo ✨";
+  })();
+
+  const progressLabel = streak > 0 && progressMax !== streak
+    ? `verso i ${progressMax} giorni`
+    : streak >= 365
+      ? "un anno di costanza 🏆"
+      : "";
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-10">
@@ -90,28 +121,29 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
               }
               <span className={`font-bold text-sm tracking-wide ${checkedInToday ? 'text-primary' : 'text-on-surface-variant'}`}>{streak}</span>
             </div>
-            <h2 className={`font-extrabold text-5xl tracking-tighter ${checkedInToday ? 'text-primary' : 'text-on-surface-variant'}`}>Giorno {streak}</h2>
+            <h2 className={`font-extrabold text-5xl tracking-tighter ${checkedInToday ? 'text-primary' : 'text-on-surface-variant'}`}>
+              Giorno {streak}
+            </h2>
             <p className="text-on-surface-variant font-medium text-sm text-center px-4">
-              {streak === 0
-                ? "Inizia oggi!"
-                : checkedInToday
-                  ? "ce la stai facendo"
-                  : "check-in per continuare!"}
+              {streakLabel}
             </p>
+            {progressLabel ? (
+              <p className="text-[10px] text-primary/50 font-semibold uppercase tracking-wider">{progressLabel}</p>
+            ) : null}
           </div>
         </div>
       </section>
 
       {/* Quick Action Buttons */}
       <section className="flex gap-4">
-        <button 
+        <button
           onClick={onNavigateToDiary}
           className="flex-1 bg-gradient-to-br from-primary to-primary-container text-white h-14 rounded-full font-semibold text-sm shadow-sm active:scale-95 transition-transform flex items-center justify-center gap-2"
         >
           <PenSquare size={20} />
           Scrivi nel diario
         </button>
-        <button 
+        <button
           onClick={onNavigateToCheckIn}
           className="flex-1 bg-surface-container-highest text-primary h-14 rounded-full font-semibold text-sm active:scale-95 transition-transform flex items-center justify-center gap-2"
         >
@@ -119,6 +151,31 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
           Come mi sento?
         </button>
       </section>
+
+      {/* Evening Note Card */}
+      {eveningReminderEnabled && onOpenEveningNote && (
+        <section>
+          <button
+            onClick={onOpenEveningNote}
+            className="w-full bg-surface-container-low rounded-lg p-5 flex items-center gap-4 active:scale-[0.98] transition-all hover:bg-surface-container-high text-left"
+          >
+            <div className="w-10 h-10 rounded-full bg-tertiary-container/30 flex items-center justify-center text-tertiary shrink-0">
+              <Moon size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-tertiary">Nota Serale</p>
+              {todayEveningNote ? (
+                <p className="text-on-surface/80 text-sm line-clamp-1 mt-0.5 italic">"{todayEveningNote}"</p>
+              ) : (
+                <p className="text-on-surface-variant text-sm mt-0.5">Come è andata oggi?</p>
+              )}
+            </div>
+            {!todayEveningNote && (
+              <span className="text-primary text-lg font-bold shrink-0">+</span>
+            )}
+          </button>
+        </section>
+      )}
 
       {/* Time Capsule Section */}
       {timeCapsuleEntry && (
@@ -148,7 +205,7 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
                 </span>
               </div>
             </div>
-            <button 
+            <button
               onClick={onNavigateToDiary}
               className="mt-4 w-full py-2 text-xs font-bold text-secondary uppercase tracking-widest hover:underline underline-offset-4"
             >
@@ -159,7 +216,7 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
       )}
 
       {/* Daily Quote Card */}
-      <section 
+      <section
         onClick={onMotivationsClick}
         className="bg-surface-container-low rounded-lg p-8 relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all hover:bg-surface-container-high group"
       >
@@ -189,13 +246,12 @@ export function Home({ onNavigateToDiary, onNavigateToCheckIn, onMotivationsClic
           <div className={`w-3 h-3 rounded-full ${lastMood ? 'bg-secondary shadow-[0_0_12px_rgba(86,99,66,0.4)]' : 'bg-surface-container-highest'}`}></div>
         </div>
 
-        {/* Secondary Info Cards */}
         <div className="bg-surface-container-low rounded-lg p-4 space-y-2">
           <BookHeart className="text-primary-container" size={24} />
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Pensieri</p>
           <p className="text-lg font-bold text-on-surface">{totalEntries}</p>
         </div>
-        
+
         <div className="bg-surface-container-low rounded-lg p-4 space-y-2">
           <Clock className="text-tertiary-container" size={24} />
           <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">Ultimo</p>

@@ -13,6 +13,7 @@ import { ReminderBanner } from './components/ReminderBanner';
 import { PinLock } from './components/PinLock';
 import { SplashScreen } from './components/SplashScreen';
 import { QuickJournal } from './components/QuickJournal';
+import { EveningNote } from './components/EveningNote';
 import { DiaryEntry } from './types';
 import { Toaster, toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -65,7 +66,7 @@ export default function App() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [showSplash, setShowSplash] = useState(true);
-  
+
   const navigate = useNavigate();
   const location = useLocation();
   const currentTab = (location.pathname === '/' ? 'home' : location.pathname.substring(1)) as Tab;
@@ -73,10 +74,13 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMotivations, setShowMotivations] = useState(false);
   const [showQuickJournal, setShowQuickJournal] = useState(false);
+  const [showEveningNote, setShowEveningNote] = useState(false);
   const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
   const [reminderHour, setReminderHour] = useState(9);
+  const [eveningReminderEnabled, setEveningReminderEnabled] = useState(false);
+  const [eveningReminderHour, setEveningReminderHour] = useState(21);
   const [dismissedDate, setDismissedDate] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -101,6 +105,8 @@ export default function App() {
         const settings = JSON.parse(savedSettings);
         if (settings.remindersEnabled !== undefined) setRemindersEnabled(settings.remindersEnabled);
         if (settings.reminderHour !== undefined) setReminderHour(settings.reminderHour);
+        if (settings.eveningReminderEnabled !== undefined) setEveningReminderEnabled(settings.eveningReminderEnabled);
+        if (settings.eveningReminderHour !== undefined) setEveningReminderHour(settings.eveningReminderHour);
         if (settings.dismissedDate !== undefined) setDismissedDate(settings.dismissedDate);
         if (settings.theme) setTheme(settings.theme);
         if (settings.avatarUrl) setAvatarUrl(settings.avatarUrl);
@@ -109,7 +115,6 @@ export default function App() {
       }
     }
 
-    // Artificial delay for splash screen
     const timer = setTimeout(() => {
       setShowSplash(false);
     }, 2500);
@@ -131,52 +136,82 @@ export default function App() {
     localStorage.setItem('diary_entries', JSON.stringify(entries));
   }, [entries]);
 
-  const saveSettingsLocally = (reminders: boolean, hour: number, dismissed: string | null, currentTheme: 'light' | 'dark', currentAvatar: string | null) => {
+  const saveSettingsLocally = (
+    reminders: boolean,
+    hour: number,
+    dismissed: string | null,
+    currentTheme: 'light' | 'dark',
+    currentAvatar: string | null,
+    eveningReminders: boolean,
+    eveningHour: number,
+  ) => {
     const settings = {
       remindersEnabled: reminders,
       reminderHour: hour,
+      eveningReminderEnabled: eveningReminders,
+      eveningReminderHour: eveningHour,
       dismissedDate: dismissed,
       theme: currentTheme,
-      avatarUrl: currentAvatar
+      avatarUrl: currentAvatar,
     };
     localStorage.setItem('app_settings', JSON.stringify(settings));
   };
 
   const handleToggleReminders = (enabled: boolean) => {
     setRemindersEnabled(enabled);
-    saveSettingsLocally(enabled, reminderHour, dismissedDate, theme, avatarUrl);
+    saveSettingsLocally(enabled, reminderHour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
     saveReminderSettings({ enabled, hour: reminderHour });
-    sendReminderStateToSW(enabled, reminderHour);
+    sendReminderStateToSW(enabled, reminderHour, eveningReminderEnabled, eveningReminderHour);
   };
 
   const handleReminderHourChange = (hour: number) => {
     setReminderHour(hour);
-    saveSettingsLocally(remindersEnabled, hour, dismissedDate, theme, avatarUrl);
+    saveSettingsLocally(remindersEnabled, hour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
     saveReminderSettings({ enabled: remindersEnabled, hour });
-    sendReminderStateToSW(remindersEnabled, hour);
+    sendReminderStateToSW(remindersEnabled, hour, eveningReminderEnabled, eveningReminderHour);
+  };
+
+  const handleToggleEveningReminder = (enabled: boolean) => {
+    setEveningReminderEnabled(enabled);
+    saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, avatarUrl, enabled, eveningReminderHour);
+    sendReminderStateToSW(remindersEnabled, reminderHour, enabled, eveningReminderHour);
+  };
+
+  const handleEveningReminderHourChange = (hour: number) => {
+    setEveningReminderHour(hour);
+    saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, hour);
+    sendReminderStateToSW(remindersEnabled, reminderHour, eveningReminderEnabled, hour);
   };
 
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
     setTheme(newTheme);
-    saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, newTheme, avatarUrl);
+    saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, newTheme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
   };
 
   const handleAvatarChange = (newAvatar: string | null) => {
     setAvatarUrl(newAvatar);
-    saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, newAvatar);
+    saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, newAvatar, eveningReminderEnabled, eveningReminderHour);
   };
 
   const handleDismissReminder = () => {
     const todayStr = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
     setDismissedDate(todayStr);
-    saveSettingsLocally(remindersEnabled, reminderHour, todayStr, theme, avatarUrl);
+    saveSettingsLocally(remindersEnabled, reminderHour, todayStr, theme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
   };
 
   const todayStr = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
   const hasCheckedInToday = entries.some(e => e.date === todayStr);
 
+  // Today's evening note (from the most recent entry of today)
+  const todayEveningNote = entries.find(e => e.date === todayStr)?.eveningNote;
+
   /** Send current reminder state to the service worker via postMessage. */
-  function sendReminderStateToSW(enabled: boolean, hour: number) {
+  function sendReminderStateToSW(
+    enabled: boolean,
+    hour: number,
+    eveningEnabled: boolean,
+    eveningHour: number,
+  ) {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.ready.then(reg => {
       reg.active?.postMessage({
@@ -184,6 +219,8 @@ export default function App() {
         enabled,
         hour,
         checkedInToday: hasCheckedInToday,
+        eveningEnabled,
+        eveningHour,
       });
     }).catch(() => {});
   }
@@ -197,6 +234,8 @@ export default function App() {
         if ('periodicSync' in reg) {
           // @ts-ignore
           await reg.periodicSync.register('checkin-reminder', { minInterval: 12 * 60 * 60 * 1000 });
+          // @ts-ignore
+          await reg.periodicSync.register('evening-reminder', { minInterval: 12 * 60 * 60 * 1000 });
         }
       } catch (_) {
         // periodicSync not supported or permission denied – silent fallback
@@ -206,8 +245,8 @@ export default function App() {
 
   // Sync reminder state with SW whenever relevant state changes
   useEffect(() => {
-    sendReminderStateToSW(remindersEnabled, reminderHour);
-  }, [remindersEnabled, reminderHour, hasCheckedInToday]);
+    sendReminderStateToSW(remindersEnabled, reminderHour, eveningReminderEnabled, eveningReminderHour);
+  }, [remindersEnabled, reminderHour, eveningReminderEnabled, eveningReminderHour, hasCheckedInToday]);
 
   // Register periodic sync once on mount
   useEffect(() => {
@@ -218,9 +257,9 @@ export default function App() {
 
   const handleSaveEntry = (newEntryData: Omit<DiaryEntry, 'id' | 'timestamp' | 'date' | 'time' | 'uid'>) => {
     if (editingEntry) {
-      const updatedEntries = entries.map(e => 
-        e.id === editingEntry.id 
-          ? { ...e, mood: newEntryData.mood, note: newEntryData.note } 
+      const updatedEntries = entries.map(e =>
+        e.id === editingEntry.id
+          ? { ...e, mood: newEntryData.mood, note: newEntryData.note }
           : e
       );
       setEntries(updatedEntries);
@@ -230,14 +269,14 @@ export default function App() {
       const now = new Date();
       const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
       const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
-      
+
       const newEntry: DiaryEntry = {
         ...newEntryData,
         id: crypto.randomUUID(),
         timestamp: now.getTime(),
         date: now.toLocaleDateString('it-IT', dateOpts).toUpperCase(),
         time: now.toLocaleTimeString('it-IT', timeOpts),
-        uid: 'local-user'
+        uid: 'local-user',
       };
 
       const updatedEntries = [newEntry, ...entries];
@@ -252,6 +291,46 @@ export default function App() {
     navigate('/diary');
   };
 
+  /** Save/update the evening note for today. */
+  const handleSaveEveningNote = (note: string) => {
+    const now = new Date();
+    const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+    const todayEnd   = new Date(now); todayEnd.setHours(23, 59, 59, 999);
+
+    const todayEntryIndex = entries.findIndex(
+      e => e.timestamp >= todayStart.getTime() && e.timestamp <= todayEnd.getTime()
+    );
+
+    let updatedEntries: DiaryEntry[];
+
+    if (todayEntryIndex >= 0) {
+      // Aggiorna l'entry di oggi
+      updatedEntries = entries.map((e, i) =>
+        i === todayEntryIndex ? { ...e, eveningNote: note } : e
+      );
+    } else {
+      // Crea un'entry leggera (solo nota serale, mood neutro)
+      const dateOpts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+      const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+      const newEntry: DiaryEntry = {
+        id: crypto.randomUUID(),
+        timestamp: now.getTime(),
+        date: now.toLocaleDateString('it-IT', dateOpts).toUpperCase(),
+        time: now.toLocaleTimeString('it-IT', timeOpts),
+        mood: 'Neutro',
+        note: '',
+        uid: 'local-user',
+        eveningNote: note,
+      };
+      updatedEntries = [newEntry, ...entries];
+    }
+
+    setEntries(updatedEntries);
+    localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+    setShowEveningNote(false);
+    toast.success('Nota serale salvata 🌙');
+  };
+
   const handleLogout = () => {
     setIsUnlocked(false);
   };
@@ -262,12 +341,12 @@ export default function App() {
 
   if (!isUnlocked) {
     return (
-      <PinLock 
-        isSetup={!hasPin} 
+      <PinLock
+        isSetup={!hasPin}
         onUnlock={() => {
           setIsUnlocked(true);
           setHasPin(true);
-        }} 
+        }}
       />
     );
   }
@@ -281,6 +360,10 @@ export default function App() {
           onToggleReminders={handleToggleReminders}
           reminderHour={reminderHour}
           onReminderHourChange={handleReminderHourChange}
+          eveningReminderEnabled={eveningReminderEnabled}
+          onToggleEveningReminder={handleToggleEveningReminder}
+          eveningReminderHour={eveningReminderHour}
+          onEveningReminderHourChange={handleEveningReminderHourChange}
           onLogout={handleLogout}
           onCheckUpdates={() => updateServiceWorker(true)}
           theme={theme}
@@ -293,12 +376,12 @@ export default function App() {
 
     if (showQuickJournal) {
       return (
-        <QuickJournal 
+        <QuickJournal
           onBack={() => {
             setShowQuickJournal(false);
             setEditingEntry(null);
-          }} 
-          onSave={handleSaveEntry} 
+          }}
+          onSave={handleSaveEntry}
           initialEntry={editingEntry}
         />
       );
@@ -306,8 +389,8 @@ export default function App() {
 
     if (showMotivations) {
       return (
-        <Motivations 
-          onClose={() => setShowMotivations(false)} 
+        <Motivations
+          onClose={() => setShowMotivations(false)}
         />
       );
     }
@@ -315,23 +398,26 @@ export default function App() {
     return (
       <Routes>
         <Route path="/" element={
-          <Home 
+          <Home
             onNavigateToDiary={() => navigate('/diary')}
             onNavigateToCheckIn={() => navigate('/checkin')}
             onMotivationsClick={() => setShowMotivations(true)}
             lastMood={entries[0]?.mood}
             entries={entries}
+            eveningReminderEnabled={eveningReminderEnabled}
+            onOpenEveningNote={() => setShowEveningNote(true)}
+            todayEveningNote={todayEveningNote}
           />
         } />
         <Route path="/home" element={<Navigate to="/" replace />} />
         <Route path="/checkin" element={<CheckIn onSave={handleSaveEntry} />} />
         <Route path="/diary" element={
-          <Diary 
-            entries={entries} 
+          <Diary
+            entries={entries}
             onAddEntry={() => {
               setEditingEntry(null);
               setShowQuickJournal(true);
-            }} 
+            }}
             onEditEntry={(entry) => {
               setEditingEntry(entry);
               setShowQuickJournal(true);
@@ -339,7 +425,7 @@ export default function App() {
           />
         } />
         <Route path="/journey" element={<Journey entries={entries} />} />
-        <Route path="/echoes" element={<Echoes apiKey={process.env.GEMINI_API_KEY || ''} />} />
+        <Route path="/echoes" element={<Echoes apiKey={import.meta.env.VITE_GEMINI_API_KEY || ''} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -350,21 +436,21 @@ export default function App() {
       <Toaster position="top-center" richColors />
       <div className="w-full max-w-[430px] relative min-h-screen pb-28">
         {!showSettings && !showQuickJournal && !showMotivations && (
-          <TopBar 
-            title="Conoscermi" 
-            onSettingsClick={() => setShowSettings(true)} 
+          <TopBar
+            title="Conoscermi"
+            onSettingsClick={() => setShowSettings(true)}
             onMotivationsClick={() => setShowMotivations(true)}
             avatarUrl={avatarUrl}
           />
         )}
-        
+
         {shouldShowBanner && !showQuickJournal && (
-          <ReminderBanner 
-            onClose={handleDismissReminder} 
+          <ReminderBanner
+            onClose={handleDismissReminder}
             onClick={() => {
               navigate('/checkin');
               handleDismissReminder();
-            }} 
+            }}
           />
         )}
 
@@ -372,14 +458,22 @@ export default function App() {
           {renderContent()}
         </main>
 
+        {/* Evening Note Modal */}
+        {showEveningNote && (
+          <EveningNote
+            existingNote={todayEveningNote}
+            onSave={handleSaveEveningNote}
+            onClose={() => setShowEveningNote(false)}
+          />
+        )}
+
         {!showSettings && !showQuickJournal && !showMotivations && (
-          <BottomNav 
-            currentTab={currentTab} 
-            onTabChange={(tab) => navigate(tab === 'home' ? '/' : `/${tab}`)} 
+          <BottomNav
+            currentTab={currentTab}
+            onTabChange={(tab) => navigate(tab === 'home' ? '/' : `/${tab}`)}
           />
         )}
       </div>
     </div>
   );
 }
-

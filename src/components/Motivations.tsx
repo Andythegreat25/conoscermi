@@ -124,16 +124,29 @@ export function Motivations({ onClose }: MotivationsProps) {
 
   const fetchQuotes = async () => {
     setIsLoading(true);
+    const today = new Date().toISOString().split('T')[0];
+
+    // ── #9 Cache quote: controlla cache giornaliera prima del fetch ───────────
+    const cachedDate = localStorage.getItem('cached_quotes_date');
+    const cachedData = localStorage.getItem('cached_quotes');
+    if (cachedDate === today && cachedData) {
+      try {
+        setQuotes(JSON.parse(cachedData));
+        setIsLoading(false);
+        return;
+      } catch { /* cache corrotta, procedi con il fetch */ }
+    }
+
     try {
       const response = await fetch('https://type.fit/api/quotes').catch(() => null);
-      
+
       if (response && response.ok) {
         const data = await response.json();
-        
+
         const transformed: QuoteData[] = data.slice(0, 100).map((q: any, index: number) => {
           const text = q.text;
           const author = q.author?.replace(', type.fit', '') || 'Anonimo';
-          
+
           let category = 'Crescita';
           if (text.toLowerCase().includes('peace') || text.toLowerCase().includes('calm')) category = 'Pace interiore';
           else if (text.toLowerCase().includes('strength') || text.toLowerCase().includes('power')) category = 'Forza';
@@ -158,9 +171,29 @@ export function Motivations({ onClose }: MotivationsProps) {
         });
 
         setQuotes(transformed);
+        // Salva in cache con la data di oggi
+        try {
+          localStorage.setItem('cached_quotes', JSON.stringify(transformed));
+          localStorage.setItem('cached_quotes_date', today);
+        } catch { /* localStorage pieno, ignora */ }
+      } else {
+        // Fetch fallito: usa cache precedente se disponibile, altrimenti fallback
+        if (cachedData) {
+          try {
+            setQuotes(JSON.parse(cachedData));
+            return;
+          } catch { /* noop */ }
+        }
       }
     } catch (err) {
       console.error("Failed to fetch quotes, using fallbacks", err);
+      // Usa cache precedente se disponibile
+      if (cachedData) {
+        try {
+          setQuotes(JSON.parse(cachedData));
+          return;
+        } catch { /* noop */ }
+      }
     } finally {
       setIsLoading(false);
     }

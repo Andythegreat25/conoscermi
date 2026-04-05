@@ -8,6 +8,7 @@ export interface DiaryEntry {
   note: string;
   timestamp: number;
   uid: string;
+  eveningNote?: string; // nota di riflessione serale opzionale
 }
 
 export interface EchoMessage {
