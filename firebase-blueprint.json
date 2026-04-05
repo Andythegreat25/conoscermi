@@ -1,0 +1,40 @@
+{
+  "entities": {
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "User preferences and settings",
+      "type": "object",
+      "properties": {
+        "remindersEnabled": { "type": "boolean" },
+        "dismissedDate": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["uid"]
+    },
+    "DiaryEntry": {
+      "title": "Diary Entry",
+      "description": "A daily check-in or diary entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "mood": { "type": "string" },
+        "note": { "type": "string" },
+        "uid": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "date", "time", "mood", "uid"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "User settings document"
+    },
+    "users/{userId}/entries/{entryId}": {
+      "schema": { "$ref": "#/entities/DiaryEntry" },
+      "description": "User's diary entries"
+    }
+  }
+}
