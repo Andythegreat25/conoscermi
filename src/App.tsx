@@ -86,9 +86,13 @@ export default function App() {
       await new Promise(resolve => setTimeout(resolve, 2000));
       toast.dismiss(toastId);
       if (needRefreshRef.current) {
-        // Nuovo SW trovato → attivalo subito e ricarica (stesso comportamento del vecchio bottone)
+        // Nuovo SW trovato → attivalo subito e ricarica
         toast.loading('Aggiornamento in corso…');
-        updateServiceWorker(true);
+        try {
+          await updateServiceWorker(false); // invia SKIP_WAITING senza fare il reload
+        } finally {
+          window.location.reload(); // garantiamo sempre il reload
+        }
       } else {
         toast.success('App già aggiornata ✓');
       }
