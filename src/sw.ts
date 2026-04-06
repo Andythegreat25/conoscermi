@@ -63,6 +63,16 @@ async function getReminderSettings(): Promise<{ enabled: boolean; hour: number }
   });
 }
 
+async function getEveningReminderSettings(): Promise<{ enabled: boolean; hour: number } | null> {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction('reminder-settings', 'readonly');
+    const req = tx.objectStore('reminder-settings').get('evening');
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => resolve(null);
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Core: decide whether to show the morning notification
 // ---------------------------------------------------------------------------
@@ -93,13 +103,15 @@ async function maybeNotify(): Promise<void> {
 // Core: decide whether to show the evening notification
 // ---------------------------------------------------------------------------
 async function maybeNotifyEvening(): Promise<void> {
-  if (!eveningReminderEnabled) return;
+  // Read settings from IndexedDB so they survive SW restarts
+  const settings = await getEveningReminderSettings();
+  if (!settings?.enabled) return;
 
   const today = todayKey();
-  if (eveningNotifiedToday === today) return;   // Already notified today
+  if (eveningNotifiedToday === today) return;   // Already notified today (in this SW lifetime)
 
   const now = new Date();
-  if (now.getHours() < eveningReminderHour) return;   // Too early
+  if (now.getHours() < settings.hour) return;   // Too early
 
   eveningNotifiedToday = today;
   await self.registration.showNotification('Conoscermi', {
@@ -178,6 +190,8 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
   // Morning reminder
   if (reminderEnabled) {
     scheduleTimer(reminderHour, checkedInToday);
+    // Check immediately in case we missed the notification while the SW was terminated
+    maybeNotify();
   } else if (scheduledTimer !== null) {
     clearTimeout(scheduledTimer);
     scheduledTimer = null;
@@ -186,6 +200,8 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
   // Evening reminder
   if (eveningReminderEnabled) {
     scheduleEveningTimer(eveningReminderHour);
+    // Check immediately in case we missed the notification while the SW was terminated
+    maybeNotifyEvening();
   } else if (eveningScheduledTimer !== null) {
     clearTimeout(eveningScheduledTimer);
     eveningScheduledTimer = null;

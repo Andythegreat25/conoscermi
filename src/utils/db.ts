@@ -49,6 +49,14 @@ export function getReminderSettings(): Promise<ReminderSettings | null> {
   return dbGet<ReminderSettings>('reminder-settings', 'main');
 }
 
+export function saveEveningReminderSettings(settings: ReminderSettings): Promise<void> {
+  return dbSet('reminder-settings', 'evening', settings);
+}
+
+export function getEveningReminderSettings(): Promise<ReminderSettings | null> {
+  return dbGet<ReminderSettings>('reminder-settings', 'evening');
+}
+
 /** Store today's date in YYYY-MM-DD format so the SW can verify the check-in. */
 export function saveCheckinDate(dateStr: string): Promise<void> {
   return dbGet<string[]>('checkin-dates', 'dates').then(existing => {

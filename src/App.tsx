@@ -18,7 +18,7 @@ import { DiaryEntry } from './types';
 import { Toaster, toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw } from 'lucide-react';
-import { saveReminderSettings, saveCheckinDate } from './utils/db';
+import { saveReminderSettings, saveEveningReminderSettings, saveCheckinDate } from './utils/db';
 import { hasCheckedInToday } from './utils/streak';
 
 export default function App() {
@@ -211,12 +211,14 @@ export default function App() {
   const handleToggleEveningReminder = (enabled: boolean) => {
     setEveningReminderEnabled(enabled);
     saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, avatarUrl, enabled, eveningReminderHour);
+    saveEveningReminderSettings({ enabled, hour: eveningReminderHour });
     sendReminderStateToSW(remindersEnabled, reminderHour, enabled, eveningReminderHour);
   };
 
   const handleEveningReminderHourChange = (hour: number) => {
     setEveningReminderHour(hour);
     saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, hour);
+    saveEveningReminderSettings({ enabled: eveningReminderEnabled, hour });
     sendReminderStateToSW(remindersEnabled, reminderHour, eveningReminderEnabled, hour);
   };
 
