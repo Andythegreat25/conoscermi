@@ -6,6 +6,7 @@
   "workers_dev": true,
   "vars": {
     "ENVIRONMENT": "production",
+    "FIREBASE_PROJECT_ID": "conoscermi-c2a00",
     "ALLOWED_ORIGINS": "https://conoscermi-c2a00.web.app,https://conoscermi-c2a00.firebaseapp.com",
     "VAPID_PUBLIC_KEY": "BFM4ZtuaoVPNeDjyLxFnJJpG-B9n0mIkOD_x0eHVMTUduL8MaUoqjsQMizyeRKJoEwmXE_7MZpiCeeuljEDcW1g",
     "VAPID_SUBJECT": "https://conoscermi-c2a00.web.app"

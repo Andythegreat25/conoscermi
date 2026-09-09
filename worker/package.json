@@ -9,7 +9,8 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "@block65/webcrypto-web-push": "^2.0.0"
+    "@block65/webcrypto-web-push": "^2.0.0",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260908.1",
