@@ -19,11 +19,10 @@ diario e umore restano nel browser e non vengono inviati al servizio push.
 
 ### Configurazione
 
-1. Abilita l'accesso **Anonimo** in Firebase Authentication.
-2. In `worker/wrangler.jsonc`, collega il database D1 e imposta le variabili pubbliche.
-3. Salva la chiave VAPID privata come secret Cloudflare `VAPID_PRIVATE_KEY`: non va mai committata.
-4. Distribuisci il Worker dalla cartella `worker` con `npm run deploy`.
-5. Imposta `VITE_PUSH_API_URL` sull'indirizzo pubblico del Worker, quindi esegui
+1. In `worker/wrangler.jsonc`, collega il database D1 e imposta le variabili pubbliche.
+2. Salva la chiave VAPID privata come secret Cloudflare `VAPID_PRIVATE_KEY`: non va mai committata.
+3. Distribuisci il Worker dalla cartella `worker` con `npm run deploy`.
+4. Imposta `VITE_PUSH_API_URL` sull'indirizzo pubblico del Worker, quindi esegui
    `npm run build` e distribuisci Firebase Hosting.
 
 Su iPhone/iPad serve iOS/iPadOS 16.4 o successivo e la web app deve essere aggiunta

@@ -1,7 +1,5 @@
-import { signInAnonymously } from 'firebase/auth';
-import { auth } from '../firebase';
-
 const CLIENT_ID_KEY = 'push_client_id';
+const DEVICE_KEY = 'push_device_key';
 
 export interface PushPreferences {
   morningEnabled: boolean;
@@ -27,6 +25,15 @@ function getClientId(): string {
   return clientId;
 }
 
+function getDeviceKey(): string {
+  const existing = localStorage.getItem(DEVICE_KEY);
+  if (existing) return existing;
+
+  const deviceKey = crypto.randomUUID();
+  localStorage.setItem(DEVICE_KEY, deviceKey);
+  return deviceKey;
+}
+
 function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   const padding = '='.repeat((4 - value.length % 4) % 4);
   const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -37,17 +44,10 @@ function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-async function ensureAuthenticated(): Promise<void> {
-  if (!auth.currentUser) await signInAnonymously(auth);
-}
-
-async function authenticatedRequest(path: string, body: unknown): Promise<void> {
-  await ensureAuthenticated();
-  const token = await auth.currentUser!.getIdToken();
+async function deviceRequest(path: string, body: unknown): Promise<void> {
   const response = await fetch(apiUrl(path), {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -67,7 +67,6 @@ function assertPushSupport(): void {
 
 async function getOrCreateSubscription(): Promise<PushSubscription> {
   assertPushSupport();
-  await ensureAuthenticated();
 
   const registration = await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
@@ -87,7 +86,6 @@ async function getOrCreateSubscription(): Promise<PushSubscription> {
 /** Saves the device subscription and reminder schedule on the server. */
 export async function syncPushPreferences(preferences: PushPreferences): Promise<void> {
   assertPushSupport();
-  await ensureAuthenticated();
 
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
@@ -98,8 +96,9 @@ export async function syncPushPreferences(preferences: PushPreferences): Promise
   // Nothing has ever been subscribed on this device, so there is no server state to disable.
   if (!subscription) return;
 
-  await authenticatedRequest('/preferences', {
+  await deviceRequest('/preferences', {
     clientId: getClientId(),
+    deviceKey: getDeviceKey(),
     subscription: subscription.toJSON(),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome',
     ...preferences,
@@ -116,8 +115,12 @@ export async function recordReminderActivity(
   const subscription = await registration.pushManager.getSubscription();
   if (!subscription) return;
 
-  await ensureAuthenticated();
-  await authenticatedRequest('/activity', { clientId: getClientId(), type, date });
+  await deviceRequest('/activity', {
+    clientId: getClientId(),
+    deviceKey: getDeviceKey(),
+    type,
+    date,
+  });
 }
 
 export function localDateKey(date = new Date()): string {

@@ -3,12 +3,10 @@ import {
   type PushSubscription,
   type VapidKeys,
 } from '@block65/webcrypto-web-push';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 interface Env {
   DB: D1Database;
   ENVIRONMENT: string;
-  FIREBASE_PROJECT_ID: string;
   ALLOWED_ORIGINS: string;
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
@@ -38,10 +36,6 @@ interface LocalClock {
   hour: number;
 }
 
-const firebaseKeys = createRemoteJWKSet(new URL(
-  'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
-));
-
 function allowedOrigin(request: Request, env: Env): string | null {
   const origin = request.headers.get('Origin');
   if (!origin) return null;
@@ -51,7 +45,7 @@ function allowedOrigin(request: Request, env: Env): string | null {
 function corsHeaders(origin: string | null): HeadersInit {
   return origin ? {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
@@ -62,26 +56,13 @@ function response(body: unknown, status: number, origin: string | null): Respons
   return Response.json(body, { status, headers: corsHeaders(origin) });
 }
 
-async function authenticate(request: Request, env: Env): Promise<string> {
-  const authorization = request.headers.get('Authorization');
-  if (!authorization?.startsWith('Bearer ')) throw new Error('UNAUTHENTICATED');
-
-  const token = authorization.slice('Bearer '.length);
-  try {
-    const { payload } = await jwtVerify(token, firebaseKeys, {
-      issuer: `https://securetoken.google.com/${env.FIREBASE_PROJECT_ID}`,
-      audience: env.FIREBASE_PROJECT_ID,
-      algorithms: ['RS256'],
-    });
-    if (!payload.sub) throw new Error('UNAUTHENTICATED');
-    return payload.sub;
-  } catch {
-    throw new Error('UNAUTHENTICATED');
-  }
-}
-
 function readClientId(value: unknown): string {
   if (typeof value !== 'string' || !/^[a-f0-9-]{36}$/i.test(value)) throw new Error('INVALID_CLIENT');
+  return value;
+}
+
+function readDeviceKey(value: unknown): string {
+  if (typeof value !== 'string' || !/^[a-f0-9-]{36}$/i.test(value)) throw new Error('INVALID_DEVICE');
   return value;
 }
 
@@ -124,11 +105,11 @@ async function readJson(request: Request): Promise<Record<string, unknown>> {
 }
 
 async function savePreferences(request: Request, env: Env, origin: string): Promise<Response> {
-  const uid = await authenticate(request, env);
   const data = await readJson(request);
   const clientId = readClientId(data.clientId);
+  const deviceKey = readDeviceKey(data.deviceKey);
   const subscription = readSubscription(data.subscription);
-  const id = `${uid}:${clientId}`;
+  const id = clientId;
 
   await env.DB.prepare(`
     INSERT INTO push_subscriptions (
@@ -145,9 +126,10 @@ async function savePreferences(request: Request, env: Env, origin: string): Prom
       evening_enabled = excluded.evening_enabled,
       evening_hour = excluded.evening_hour,
       updated_at = excluded.updated_at
+    WHERE push_subscriptions.uid = excluded.uid
   `).bind(
     id,
-    uid,
+    deviceKey,
     clientId,
     subscription.endpoint,
     subscription.keys.p256dh,
@@ -164,9 +146,9 @@ async function savePreferences(request: Request, env: Env, origin: string): Prom
 }
 
 async function recordActivity(request: Request, env: Env, origin: string): Promise<Response> {
-  const uid = await authenticate(request, env);
   const data = await readJson(request);
   const clientId = readClientId(data.clientId);
+  const deviceKey = readDeviceKey(data.deviceKey);
   const type = data.type;
   const date = data.date;
   if ((type !== 'checkin' && type !== 'evening-note') || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -175,7 +157,7 @@ async function recordActivity(request: Request, env: Env, origin: string): Promi
 
   const column = type === 'checkin' ? 'last_checkin_date' : 'last_evening_note_date';
   await env.DB.prepare(`UPDATE push_subscriptions SET ${column} = ?, updated_at = ? WHERE id = ? AND uid = ?`)
-    .bind(date, Date.now(), `${uid}:${clientId}`, uid)
+    .bind(date, Date.now(), clientId, deviceKey)
     .run();
 
   return response({ ok: true }, 200, origin);
