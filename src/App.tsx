@@ -18,8 +18,9 @@ import { DiaryEntry } from './types';
 import { Toaster, toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw } from 'lucide-react';
-import { saveReminderSettings, saveEveningReminderSettings, saveCheckinDate } from './utils/db';
+import { saveReminderSettings, saveEveningReminderSettings } from './utils/db';
 import { hasCheckedInToday } from './utils/streak';
+import { localDateKey, recordReminderActivity, syncPushPreferences } from './utils/push';
 
 export default function App() {
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
@@ -125,6 +126,7 @@ export default function App() {
   const [dismissedDate, setDismissedDate] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // Check for existing PIN and load initial data
   useEffect(() => {
@@ -155,6 +157,8 @@ export default function App() {
         console.error("Failed to parse settings", e);
       }
     }
+
+    setSettingsLoaded(true);
 
     const timer = setTimeout(() => {
       setShowSplash(false);
@@ -198,32 +202,70 @@ export default function App() {
     localStorage.setItem('app_settings', JSON.stringify(settings));
   };
 
-  const handleToggleReminders = (enabled: boolean) => {
-    setRemindersEnabled(enabled);
-    saveSettingsLocally(enabled, reminderHour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
-    saveReminderSettings({ enabled, hour: reminderHour });
-    sendReminderStateToSW(enabled, reminderHour, eveningReminderEnabled, eveningReminderHour);
+  const handleToggleReminders = async (enabled: boolean) => {
+    try {
+      await syncPushPreferences({
+        morningEnabled: enabled,
+        morningHour: reminderHour,
+        eveningEnabled: eveningReminderEnabled,
+        eveningHour: eveningReminderHour,
+      });
+      setRemindersEnabled(enabled);
+      saveSettingsLocally(enabled, reminderHour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
+      await saveReminderSettings({ enabled, hour: reminderHour });
+      toast.success(enabled ? 'Promemoria mattutino attivato' : 'Promemoria mattutino disattivato');
+    } catch (error) {
+      console.error('Unable to update morning push reminder', error);
+      toast.error(error instanceof Error ? error.message : 'Impossibile configurare le notifiche push');
+    }
   };
 
   const handleReminderHourChange = (hour: number) => {
     setReminderHour(hour);
     saveSettingsLocally(remindersEnabled, hour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
     saveReminderSettings({ enabled: remindersEnabled, hour });
-    sendReminderStateToSW(remindersEnabled, hour, eveningReminderEnabled, eveningReminderHour);
+    syncPushPreferences({
+      morningEnabled: remindersEnabled,
+      morningHour: hour,
+      eveningEnabled: eveningReminderEnabled,
+      eveningHour: eveningReminderHour,
+    }).catch(error => {
+      console.error('Unable to update morning reminder hour', error);
+      toast.error('Orario salvato sul dispositivo, ma non ancora sincronizzato');
+    });
   };
 
-  const handleToggleEveningReminder = (enabled: boolean) => {
-    setEveningReminderEnabled(enabled);
-    saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, avatarUrl, enabled, eveningReminderHour);
-    saveEveningReminderSettings({ enabled, hour: eveningReminderHour });
-    sendReminderStateToSW(remindersEnabled, reminderHour, enabled, eveningReminderHour);
+  const handleToggleEveningReminder = async (enabled: boolean) => {
+    try {
+      await syncPushPreferences({
+        morningEnabled: remindersEnabled,
+        morningHour: reminderHour,
+        eveningEnabled: enabled,
+        eveningHour: eveningReminderHour,
+      });
+      setEveningReminderEnabled(enabled);
+      saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, avatarUrl, enabled, eveningReminderHour);
+      await saveEveningReminderSettings({ enabled, hour: eveningReminderHour });
+      toast.success(enabled ? 'Promemoria serale attivato' : 'Promemoria serale disattivato');
+    } catch (error) {
+      console.error('Unable to update evening push reminder', error);
+      toast.error(error instanceof Error ? error.message : 'Impossibile configurare le notifiche push');
+    }
   };
 
   const handleEveningReminderHourChange = (hour: number) => {
     setEveningReminderHour(hour);
     saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, theme, avatarUrl, eveningReminderEnabled, hour);
     saveEveningReminderSettings({ enabled: eveningReminderEnabled, hour });
-    sendReminderStateToSW(remindersEnabled, reminderHour, eveningReminderEnabled, hour);
+    syncPushPreferences({
+      morningEnabled: remindersEnabled,
+      morningHour: reminderHour,
+      eveningEnabled: eveningReminderEnabled,
+      eveningHour: hour,
+    }).catch(error => {
+      console.error('Unable to update evening reminder hour', error);
+      toast.error('Orario salvato sul dispositivo, ma non ancora sincronizzato');
+    });
   };
 
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
@@ -248,53 +290,18 @@ export default function App() {
   // Today's evening note (from the most recent entry of today)
   const todayEveningNote = entries.find(e => e.date === todayStr)?.eveningNote;
 
-  /** Send current reminder state to the service worker via postMessage. */
-  function sendReminderStateToSW(
-    enabled: boolean,
-    hour: number,
-    eveningEnabled: boolean,
-    eveningHour: number,
-  ) {
-    if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.ready.then(reg => {
-      reg.active?.postMessage({
-        type: 'UPDATE_REMINDER',
-        enabled,
-        hour,
-        checkedInToday: checkedInToday,
-        eveningEnabled,
-        eveningHour,
-      });
-    }).catch(() => {});
-  }
-
-  /** Register Periodic Background Sync (supported on Android Chrome PWA). */
-  function registerPeriodicSync() {
-    if (!('serviceWorker' in navigator)) return;
-    navigator.serviceWorker.ready.then(async reg => {
-      try {
-        // @ts-ignore – periodicSync not in standard TS types yet
-        if ('periodicSync' in reg) {
-          // @ts-ignore
-          await reg.periodicSync.register('checkin-reminder', { minInterval: 12 * 60 * 60 * 1000 });
-          // @ts-ignore
-          await reg.periodicSync.register('evening-reminder', { minInterval: 12 * 60 * 60 * 1000 });
-        }
-      } catch (_) {
-        // periodicSync not supported or permission denied – silent fallback
-      }
-    }).catch(() => {});
-  }
-
-  // Sync reminder state with SW whenever relevant state changes
+  // Migrate devices that already had reminders enabled before Web Push was added.
   useEffect(() => {
-    sendReminderStateToSW(remindersEnabled, reminderHour, eveningReminderEnabled, eveningReminderHour);
-  }, [remindersEnabled, reminderHour, eveningReminderEnabled, eveningReminderHour, checkedInToday]);
+    if (!settingsLoaded || (!remindersEnabled && !eveningReminderEnabled)) return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-  // Register periodic sync once on mount
-  useEffect(() => {
-    registerPeriodicSync();
-  }, []);
+    syncPushPreferences({
+      morningEnabled: remindersEnabled,
+      morningHour: reminderHour,
+      eveningEnabled: eveningReminderEnabled,
+      eveningHour: eveningReminderHour,
+    }).catch(error => console.warn('Push reminder migration pending', error));
+  }, [settingsLoaded]);
 
   const shouldShowBanner = remindersEnabled && !checkedInToday && dismissedDate !== todayStr && currentTab !== 'checkin' && !showSettings;
 
@@ -326,9 +333,10 @@ export default function App() {
       setEntries(updatedEntries);
       localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
 
-      // Notify SW that user has checked in today so it doesn't send a reminder
-      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      saveCheckinDate(todayKey);
+      // Prevent the server from sending today's morning reminder.
+      recordReminderActivity('checkin', localDateKey(now)).catch(error =>
+        console.warn('Unable to sync check-in date for push reminders', error)
+      );
     }
     setShowQuickJournal(false);
     navigate('/diary');
@@ -371,6 +379,9 @@ export default function App() {
 
     setEntries(updatedEntries);
     localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+    recordReminderActivity('evening-note', localDateKey(now)).catch(error =>
+      console.warn('Unable to sync evening-note date for push reminders', error)
+    );
     setShowEveningNote(false);
     toast.success('Nota serale salvata 🌙');
   };

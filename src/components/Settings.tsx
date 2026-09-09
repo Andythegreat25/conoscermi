@@ -14,11 +14,11 @@ interface StorageBreakdown {
 interface SettingsProps {
   onBack: () => void;
   remindersEnabled: boolean;
-  onToggleReminders: (enabled: boolean) => void;
+  onToggleReminders: (enabled: boolean) => Promise<void>;
   reminderHour: number;
   onReminderHourChange: (hour: number) => void;
   eveningReminderEnabled: boolean;
-  onToggleEveningReminder: (enabled: boolean) => void;
+  onToggleEveningReminder: (enabled: boolean) => Promise<void>;
   eveningReminderHour: number;
   onEveningReminderHourChange: (hour: number) => void;
   onLogout: () => void;
@@ -51,6 +51,7 @@ export function Settings({
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [storageBreakdown, setStorageBreakdown] = useState<StorageBreakdown | null>(null);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -109,29 +110,38 @@ export function Settings({
 
   // ── #3 Notification permission gestita correttamente ─────────────────────
   const handleToggle = async () => {
-    if (!remindersEnabled && 'Notification' in window) {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        onToggleReminders(true);
+    setIsUpdatingReminder(true);
+    try {
+      if (!remindersEnabled && 'Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          await onToggleReminders(true);
+        } else {
+          toast.error('Abilita le notifiche nelle impostazioni del browser per usare i promemoria');
+        }
       } else {
-        toast.error('Abilita le notifiche nelle impostazioni del browser per usare i promemoria');
-        // Non attiviamo i reminder se i permessi sono stati negati
+        await onToggleReminders(!remindersEnabled);
       }
-    } else {
-      onToggleReminders(!remindersEnabled);
+    } finally {
+      setIsUpdatingReminder(false);
     }
   };
 
   const handleToggleEvening = async () => {
-    if (!eveningReminderEnabled && 'Notification' in window) {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        onToggleEveningReminder(true);
+    setIsUpdatingReminder(true);
+    try {
+      if (!eveningReminderEnabled && 'Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          await onToggleEveningReminder(true);
+        } else {
+          toast.error('Abilita le notifiche nelle impostazioni del browser per usare i promemoria');
+        }
       } else {
-        toast.error('Abilita le notifiche nelle impostazioni del browser per usare i promemoria');
+        await onToggleEveningReminder(!eveningReminderEnabled);
       }
-    } else {
-      onToggleEveningReminder(!eveningReminderEnabled);
+    } finally {
+      setIsUpdatingReminder(false);
     }
   };
 
@@ -387,7 +397,8 @@ export function Settings({
               </div>
               <button
                 onClick={handleToggle}
-                className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${remindersEnabled ? 'bg-primary' : 'bg-outline-variant'}`}
+                disabled={isUpdatingReminder}
+                className={`w-12 h-6 rounded-full transition-colors relative shrink-0 disabled:opacity-50 ${remindersEnabled ? 'bg-primary' : 'bg-outline-variant'}`}
               >
                 <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${remindersEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
               </button>
@@ -420,7 +431,8 @@ export function Settings({
               </div>
               <button
                 onClick={handleToggleEvening}
-                className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${eveningReminderEnabled ? 'bg-tertiary' : 'bg-outline-variant'}`}
+                disabled={isUpdatingReminder}
+                className={`w-12 h-6 rounded-full transition-colors relative shrink-0 disabled:opacity-50 ${eveningReminderEnabled ? 'bg-tertiary' : 'bg-outline-variant'}`}
               >
                 <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${eveningReminderEnabled ? 'translate-x-7' : 'translate-x-1'}`} />
               </button>

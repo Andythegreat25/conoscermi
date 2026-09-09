@@ -1,20 +1,30 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Conoscermi
 
-# Run and deploy your AI Studio app
+Web app personale con diario, statistiche, serie di giorni consecutivi e promemoria push.
 
-This contains everything you need to run your app locally.
+## Sviluppo locale
 
-View your app in AI Studio: https://ai.studio/apps/a90cddba-e418-46ef-a91a-0d0f03041a1c
+Prerequisito: Node.js.
 
-## Run Locally
+1. Installa le dipendenze con `npm install`.
+2. Copia `.env.example` in `.env.local` e configura le variabili necessarie.
+3. Avvia l'app con `npm run dev`.
 
-**Prerequisites:**  Node.js
+## Promemoria push in background
 
+I promemoria usano Web Push, un Cloudflare Worker con esecuzione programmata e un
+database D1. Il Worker controlla ogni ora l'orario locale del dispositivo e non
+invia il promemoria se l'attività corrispondente è già stata registrata. Testo del
+diario e umore restano nel browser e non vengono inviati al servizio push.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Configurazione
+
+1. Abilita l'accesso **Anonimo** in Firebase Authentication.
+2. In `worker/wrangler.jsonc`, collega il database D1 e imposta le variabili pubbliche.
+3. Salva la chiave VAPID privata come secret Cloudflare `VAPID_PRIVATE_KEY`: non va mai committata.
+4. Distribuisci il Worker dalla cartella `worker` con `npm run deploy`.
+5. Imposta `VITE_PUSH_API_URL` sull'indirizzo pubblico del Worker, quindi esegui
+   `npm run build` e distribuisci Firebase Hosting.
+
+Su iPhone/iPad serve iOS/iPadOS 16.4 o successivo e la web app deve essere aggiunta
+alla schermata Home. Il permesso va richiesto usando l'interruttore nell'app.
