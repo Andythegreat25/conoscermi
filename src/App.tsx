@@ -122,6 +122,7 @@ export default function App() {
   const isWriting = showQuickJournal || showEveningNote;
   useEffect(() => {
     if (!needRefresh) return;
+    // Il ricaricamento vero lo fa il listener su controllerchange; qui si chiede solo l'attivazione.
     if (isWriting) {
       toast('Aggiornamento pronto', {
         id: 'update-ready',
@@ -140,6 +141,14 @@ export default function App() {
   useEffect(() => {
     const savedPin = localStorage.getItem('user_pin');
     setHasPin(!!savedPin);
+
+    // Dopo un ricaricamento per aggiornamento (solo in questa scheda) resta sbloccata
+    try {
+      if (sessionStorage.getItem('resume_unlocked') === '1') {
+        sessionStorage.removeItem('resume_unlocked');
+        if (savedPin) setIsUnlocked(true);
+      }
+    } catch { /* noop */ }
 
     const savedEntries = localStorage.getItem('diary_entries');
     if (savedEntries) {
@@ -183,6 +192,44 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // Quando una nuova versione prende il controllo, ricarica la pagina per mostrarla.
+  // Se stai scrivendo aspetta, e dopo il ricaricamento non richiede di nuovo il PIN.
+  const isWritingRef = useRef(false);
+  const reloadPendingRef = useRef(false);
+  const reloadForUpdate = () => {
+    try { sessionStorage.setItem('resume_unlocked', '1'); } catch { /* noop */ }
+    window.location.reload();
+  };
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    // Alla primissima installazione non c'è nulla da sostituire: niente ricarica.
+    const hadController = !!navigator.serviceWorker.controller;
+    const onControllerChange = () => {
+      if (!hadController) return;
+      if (isWritingRef.current) {
+        reloadPendingRef.current = true;
+        toast('Aggiornamento pronto', {
+          id: 'update-ready',
+          description: 'L\'app si aggiornerà appena finisci di scrivere.',
+          duration: Infinity,
+        });
+        return;
+      }
+      reloadForUpdate();
+    };
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+  }, []);
+
+  useEffect(() => {
+    isWritingRef.current = isWriting;
+    if (!isWriting && reloadPendingRef.current) {
+      reloadPendingRef.current = false;
+      reloadForUpdate();
+    }
+  }, [isWriting]);
 
   // A ogni cambio di vista (tab, diario, impostazioni, motivazioni) si riparte dall'alto,
   // altrimenti la pagina resta alla posizione di scroll della schermata precedente.

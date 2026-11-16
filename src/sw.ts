@@ -5,9 +5,14 @@ import { clientsClaim } from 'workbox-core';
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Con registerType 'prompt' l'app chiede alla nuova versione di attivarsi con
-// questo messaggio. Senza gestore la versione nuova resterebbe in attesa finché
-// non si chiudono tutte le schede, e l'app non si aggiornerebbe mai.
+// La nuova versione si attiva subito, senza aspettare che l'app venga chiusa del tutto.
+// Su telefono una PWA può restare "aperta" in background per giorni: se la nuova
+// versione aspettasse, resterebbe in coda e vedresti sempre quella vecchia.
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+// Resta anche il comando esplicito, usato dal pulsante "Controlla aggiornamenti".
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
