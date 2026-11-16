@@ -142,11 +142,14 @@ export default function App() {
     const savedPin = localStorage.getItem('user_pin');
     setHasPin(!!savedPin);
 
-    // Dopo un ricaricamento per aggiornamento (solo in questa scheda) resta sbloccata
+    // Dopo un ricaricamento per aggiornamento (solo in questa scheda) resta sbloccata.
+    // Il flag vale 10 secondi e si elimina subito: oltre, serve di nuovo il PIN.
     try {
-      if (sessionStorage.getItem('resume_unlocked') === '1') {
-        sessionStorage.removeItem('resume_unlocked');
-        if (savedPin) setIsUnlocked(true);
+      const stamp = Number(sessionStorage.getItem('resume_unlocked'));
+      sessionStorage.removeItem('resume_unlocked');
+      const age = Date.now() - stamp;
+      if (savedPin && Number.isFinite(stamp) && stamp > 0 && age >= 0 && age < 10_000) {
+        setIsUnlocked(true);
       }
     } catch { /* noop */ }
 
@@ -197,8 +200,17 @@ export default function App() {
   // Se stai scrivendo aspetta, e dopo il ricaricamento non richiede di nuovo il PIN.
   const isWritingRef = useRef(false);
   const reloadPendingRef = useRef(false);
+  const isUnlockedRef = useRef(false);
+  useEffect(() => {
+    isUnlockedRef.current = isUnlocked;
+  }, [isUnlocked]);
+
   const reloadForUpdate = () => {
-    try { sessionStorage.setItem('resume_unlocked', '1'); } catch { /* noop */ }
+    // Il flag di ripresa si salva solo se l'app è davvero sbloccata in questo momento,
+    // altrimenti un aggiornamento arrivato sulla schermata del PIN la aggirerebbe.
+    if (isUnlockedRef.current) {
+      try { sessionStorage.setItem('resume_unlocked', String(Date.now())); } catch { /* noop */ }
+    }
     window.location.reload();
   };
 
