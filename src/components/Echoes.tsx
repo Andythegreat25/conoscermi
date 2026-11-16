@@ -262,7 +262,7 @@ export function Echoes({ apiKey }: EchoesProps) {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-180px)] animate-in fade-in duration-500">
+    <div className="flex flex-col h-[calc(100dvh-180px)] animate-in fade-in duration-500">
       <header className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
@@ -284,7 +284,7 @@ export function Echoes({ apiKey }: EchoesProps) {
 
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto space-y-4 pr-2 hide-scrollbar"
+        className="flex-1 overflow-y-auto overscroll-contain space-y-4 pr-2 hide-scrollbar"
       >
         {messages.map((msg) => (
           <div 
@@ -312,8 +312,10 @@ export function Echoes({ apiKey }: EchoesProps) {
       </div>
 
       <div className="mt-4 flex gap-2">
-        <input 
+        <input
           type="text"
+          enterKeyHint="send"
+          autoComplete="off"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}

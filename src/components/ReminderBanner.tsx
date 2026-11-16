@@ -7,7 +7,7 @@ interface ReminderBannerProps {
 
 export function ReminderBanner({ onClose, onClick }: ReminderBannerProps) {
   return (
-    <div className="absolute top-20 left-6 right-6 z-40 animate-in slide-in-from-top-4 fade-in duration-500">
+    <div className="absolute top-[calc(5rem+env(safe-area-inset-top))] left-6 right-6 z-40 animate-in slide-in-from-top-4 fade-in duration-500">
       <div className="bg-surface-container-highest rounded-2xl p-4 shadow-[0_12px_32px_rgba(61,61,61,0.06)] flex items-start gap-4 border border-outline-variant/20">
         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
           <Bell className="text-primary" size={20} />

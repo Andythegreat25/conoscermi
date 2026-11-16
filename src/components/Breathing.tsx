@@ -179,7 +179,7 @@ export function Breathing({ onClose }: BreathingProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Respirazione guidata"
-      className="fixed inset-0 z-[70] bg-surface text-on-surface overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-[70] bg-surface text-on-surface overflow-y-auto overscroll-contain animate-in fade-in duration-200"
     >
       <div
         className="mx-auto w-full max-w-[430px] min-h-full flex flex-col px-6"

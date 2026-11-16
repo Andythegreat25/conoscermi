@@ -194,6 +194,10 @@ export default function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    // La barra di stato del telefono prende il colore dello sfondo dell'app
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#141411' : '#fdf9f3');
   }, [theme]);
 
   // Quando una nuova versione prende il controllo, ricarica la pagina per mostrarla.
@@ -582,9 +586,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface font-sans selection:bg-primary-container selection:text-on-primary-container flex justify-center">
-      <Toaster position="top-center" richColors />
-      <div className="w-full max-w-[430px] relative min-h-screen pb-28">
+    <div className="min-h-dvh bg-surface text-on-surface font-sans selection:bg-primary-container selection:text-on-primary-container flex justify-center">
+      <Toaster position="top-center" richColors offset="calc(env(safe-area-inset-top) + 16px)" />
+      <div className="w-full max-w-[430px] relative min-h-dvh pb-[calc(7rem+env(safe-area-inset-bottom))]">
         {!showSettings && !showQuickJournal && !showMotivations && (
           <TopBar
             title="Conoscermi"
@@ -604,7 +608,13 @@ export default function App() {
           />
         )}
 
-        <main className={`px-6 ${showSettings || showQuickJournal || showMotivations ? 'pt-12' : 'pt-24'}`}>
+        <main
+          className={`px-6 ${
+            showSettings || showQuickJournal || showMotivations
+              ? 'pt-[calc(3rem+env(safe-area-inset-top))]'
+              : 'pt-[calc(6rem+env(safe-area-inset-top))]'
+          }`}
+        >
           {renderContent()}
         </main>
 

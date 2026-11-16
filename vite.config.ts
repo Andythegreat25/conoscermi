@@ -16,26 +16,20 @@ export default defineConfig(({mode}) => {
         srcDir: 'src',
         filename: 'sw.ts',
         registerType: 'prompt',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+        includeAssets: ['icon.svg', 'apple-touch-icon.png'],
         manifest: {
           name: 'Conoscermi',
           short_name: 'Conoscermi',
           description: 'Il tuo percorso di rinascita e consapevolezza',
-          theme_color: '#ffffff',
-          background_color: '#ffffff',
+          theme_color: '#fdf9f3',
+          background_color: '#fdf9f3',
           display: 'standalone',
+          lang: 'it',
           icons: [
-            {
-              src: 'icon.svg',
-              sizes: '192x192 512x512',
-              type: 'image/svg+xml'
-            },
-            {
-              src: 'icon.svg',
-              sizes: '192x192 512x512',
-              type: 'image/svg+xml',
-              purpose: 'any maskable'
-            }
+            { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+            { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
           ]
         }
       })

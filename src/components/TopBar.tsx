@@ -11,7 +11,10 @@ interface TopBarProps {
 export function TopBar({ title, onSettingsClick, onMotivationsClick, avatarUrl }: TopBarProps) {
   return (
     <header className="fixed top-0 w-full z-50 flex justify-center pointer-events-none">
-      <div className="glass w-full max-w-[430px] pointer-events-auto border-b border-white/40 dark:border-white/10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.04)]">
+      <div
+        className="glass w-full max-w-[430px] pointer-events-auto border-b border-white/40 dark:border-white/10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.04)]"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
         <div className="flex justify-between items-center px-4 h-16 w-full">
           <div className="flex items-center gap-1">
             <button

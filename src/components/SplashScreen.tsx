@@ -3,7 +3,7 @@ import { Leaf } from 'lucide-react';
 
 export function SplashScreen() {
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-6 overflow-hidden">
+    <div className="min-h-dvh bg-surface flex flex-col items-center justify-center p-6 overflow-hidden">
       <motion.div 
         initial={{ opacity: 0, scale: 0.8, rotate: -10 }}
         animate={{ opacity: 1, scale: 1, rotate: 12 }}

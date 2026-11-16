@@ -79,7 +79,9 @@ export function Diary({ entries, onAddEntry, onEditEntry, onDeleteEntry }: Diary
             <Search className="text-outline" size={20} />
           </div>
           <input
-            type="text"
+            type="search"
+            enterKeyHint="search"
+            autoComplete="off"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-14 pl-12 pr-12 bg-surface-container-highest border-none rounded-full focus:ring-0 focus:bg-surface-container-lowest transition-all placeholder:text-outline/60 text-on-surface"

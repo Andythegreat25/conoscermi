@@ -59,7 +59,7 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4 pb-8 bg-on-surface/40 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4 pb-[calc(2rem+env(safe-area-inset-bottom))] bg-on-surface/40 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onCancel}
     >
       <div

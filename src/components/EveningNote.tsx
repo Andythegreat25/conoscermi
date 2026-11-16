@@ -79,8 +79,13 @@ export function EveningNote({ existingNote, onSave, onClose }: EveningNoteProps)
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
           // px-6 pt-6 — bottom padding handled by inline style (keyboard-aware)
-          style={{ paddingBottom: `${bottomPad}px` }}
-          className="w-full max-w-[430px] bg-surface rounded-t-3xl px-6 pt-6 space-y-5 shadow-2xl overflow-y-auto max-h-[92vh]"
+          style={{
+            paddingBottom:
+              bottomPad === 40
+                ? 'calc(40px + env(safe-area-inset-bottom))'
+                : `${bottomPad}px`,
+          }}
+          className="w-full max-w-[430px] bg-surface rounded-t-3xl px-6 pt-6 space-y-5 shadow-2xl overflow-y-auto overscroll-contain max-h-[92dvh]"
         >
           {/* Header */}
           <div className="flex items-center justify-between">

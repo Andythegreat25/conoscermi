@@ -2,16 +2,34 @@
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#ffffff" />
+    <!-- viewport-fit=cover: la pagina arriva sotto tacca e indicatore Home, i contenuti si distanziano con env(safe-area-inset-*).
+         interactive-widget=resizes-content: la tastiera riduce l'area visibile invece di coprirla.
+         Lo zoom resta attivo: il fastidio su iOS si evita con campi a 16px. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#fdf9f3" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="description" content="Il tuo percorso di rinascita e consapevolezza" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Conoscermi" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Conoscermi</title>
+    <script>
+      // Applica subito il tema salvato: niente lampo chiaro prima che parta React,
+      // e barra di stato già del colore giusto.
+      try {
+        var s = JSON.parse(localStorage.getItem('app_settings') || '{}');
+        if (s.theme === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#141411');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

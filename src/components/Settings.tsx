@@ -409,7 +409,7 @@ export function Settings({
                 <select
                   value={reminderHour}
                   onChange={e => onReminderHourChange(Number(e.target.value))}
-                  className="bg-surface-container-highest text-on-surface font-bold text-sm px-3 py-2 rounded-xl border-0 focus:ring-2 focus:ring-primary outline-none"
+                  className="bg-surface-container-highest text-on-surface font-bold text-base px-3 py-2 rounded-xl border-0 focus:ring-2 focus:ring-primary outline-none"
                 >
                   {hourOptions.map(h => (
                     <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
@@ -443,7 +443,7 @@ export function Settings({
                 <select
                   value={eveningReminderHour}
                   onChange={e => onEveningReminderHourChange(Number(e.target.value))}
-                  className="bg-surface-container-highest text-on-surface font-bold text-sm px-3 py-2 rounded-xl border-0 focus:ring-2 focus:ring-tertiary outline-none"
+                  className="bg-surface-container-highest text-on-surface font-bold text-base px-3 py-2 rounded-xl border-0 focus:ring-2 focus:ring-tertiary outline-none"
                 >
                   {Array.from({ length: 7 }, (_, i) => i + 18).map(h => (
                     <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
