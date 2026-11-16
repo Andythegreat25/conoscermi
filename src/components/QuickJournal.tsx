@@ -113,7 +113,7 @@ export function QuickJournal({ onSave, onBack, initialEntry }: QuickJournalProps
                 onClick={() => setSelectedMood(mood.id)}
                 className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl transition-all active:scale-95 ${
                   isActive 
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                    ? 'bg-primary text-on-primary shadow-lg shadow-primary/20' 
                     : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
                 }`}
               >
@@ -129,7 +129,7 @@ export function QuickJournal({ onSave, onBack, initialEntry }: QuickJournalProps
         <button
           onClick={handleSave}
           disabled={!note.trim()}
-          className="w-full h-14 rounded-full bg-gradient-to-br from-primary to-primary-container text-white font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100"
+          className="w-full h-14 rounded-full bg-gradient-to-br from-primary to-primary-soft text-on-primary font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100"
         >
           <CheckCircle2 size={22} />
           {initialEntry ? "Salva Modifiche" : "Salva nel diario"}

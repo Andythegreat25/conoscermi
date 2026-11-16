@@ -3,6 +3,7 @@ import { MessageCircle, Upload, Send, User, Sparkles, Trash2, ArrowLeft, Info, L
 import { EchoMessage, Persona } from '../types';
 import { GoogleGenAI } from "@google/genai";
 import { toast } from 'sonner';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface EchoesProps {
   apiKey: string;
@@ -14,6 +15,7 @@ export function Echoes({ apiKey }: EchoesProps) {
   const [input, setInput] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -200,12 +202,11 @@ export function Echoes({ apiKey }: EchoesProps) {
   };
 
   const resetPersona = () => {
-    if (window.confirm("Sei sicuro di voler eliminare questo profilo? Dovrai ricaricare la chat.")) {
-      setPersona(null);
-      setMessages([]);
-      localStorage.removeItem('echo_persona');
-      localStorage.removeItem('echo_messages');
-    }
+    setPersona(null);
+    setMessages([]);
+    localStorage.removeItem('echo_persona');
+    localStorage.removeItem('echo_messages');
+    setConfirmReset(false);
   };
 
   if (!persona) {
@@ -234,7 +235,7 @@ export function Echoes({ apiKey }: EchoesProps) {
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
-            className="bg-primary text-white px-8 py-4 rounded-full font-bold shadow-lg active:scale-95 transition-all flex items-center gap-2"
+            className="bg-primary text-on-primary px-8 py-4 rounded-full font-bold shadow-lg active:scale-95 transition-all flex items-center gap-2"
           >
             Seleziona File .txt
           </button>
@@ -273,8 +274,9 @@ export function Echoes({ apiKey }: EchoesProps) {
           </div>
         </div>
         <button 
-          onClick={resetPersona}
-          className="p-2 text-on-surface-variant hover:text-destructive transition-colors"
+          onClick={() => setConfirmReset(true)}
+          aria-label="Elimina profilo"
+          className="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-error transition-colors"
         >
           <Trash2 size={20} />
         </button>
@@ -291,7 +293,7 @@ export function Echoes({ apiKey }: EchoesProps) {
           >
             <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
               msg.role === 'user' 
-                ? 'bg-primary text-white rounded-tr-none' 
+                ? 'bg-primary text-on-primary rounded-tr-none' 
                 : 'bg-surface-container-highest text-on-surface rounded-tl-none'
             }`}>
               {msg.content}
@@ -321,11 +323,21 @@ export function Echoes({ apiKey }: EchoesProps) {
         <button 
           onClick={handleSendMessage}
           disabled={!input.trim() || isTyping}
-          className="w-14 h-14 bg-primary text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all disabled:opacity-50"
+          className="w-14 h-14 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all disabled:opacity-50"
         >
           <Send size={24} />
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="Eliminare questo profilo?"
+        message="La conversazione e l'eco digitale verranno rimossi. Dovrai importare di nuovo la chat."
+        confirmLabel="Elimina"
+        destructive
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={resetPersona}
+      />
     </div>
   );
 }

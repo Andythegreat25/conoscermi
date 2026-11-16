@@ -17,27 +17,35 @@ export function BottomNav({ currentTab, onTabChange }: BottomNavProps) {
   ] as const;
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none">
-      <div className="w-full max-w-[430px] bg-surface/80 backdrop-blur-xl rounded-t-[32px] shadow-[0_-12px_32px_rgba(61,61,61,0.06)] pointer-events-auto">
-        <div className="flex justify-around items-center px-4 pb-6 pt-2 h-20">
+    <nav
+      aria-label="Navigazione principale"
+      className="fixed bottom-0 left-0 w-full z-50 flex justify-center pointer-events-none px-3"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+    >
+      <div className="glass w-full max-w-[400px] rounded-full border border-white/50 dark:border-white/10 shadow-[0_12px_32px_rgba(40,30,25,0.14),inset_0_1px_0_rgba(255,255,255,0.7)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.12)] pointer-events-auto">
+        <div className="flex items-stretch justify-between gap-1 p-1.5">
           {tabs.map(({ id, icon: Icon, label }) => {
             const isActive = currentTab === id;
             return (
               <button
                 key={id}
+                type="button"
                 onClick={() => onTabChange(id)}
-                className={`flex flex-col items-center justify-center p-2 transition-all duration-300 active:scale-90 ${
-                  isActive 
-                    ? 'bg-gradient-to-br from-primary to-primary-container text-white rounded-full p-3 mb-1 shadow-lg' 
-                    : 'text-outline-variant hover:text-primary'
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex-1 min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 rounded-full px-1 py-1.5 transition-[background-color,color,transform] duration-200 active:scale-95 ${
+                  isActive
+                    ? 'bg-primary/15 text-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]'
+                    : 'text-on-surface-variant hover:text-primary'
                 }`}
               >
-                <Icon size={isActive ? 24 : 24} strokeWidth={isActive ? 2.5 : 2} />
-                {!isActive && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider mt-1">
-                    {label}
-                  </span>
-                )}
+                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+                <span
+                  className={`whitespace-nowrap text-[10px] leading-none tracking-wide ${
+                    isActive ? 'font-bold' : 'font-medium'
+                  }`}
+                >
+                  {label}
+                </span>
               </button>
             );
           })}

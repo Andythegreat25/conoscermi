@@ -1,4 +1,5 @@
 import { Settings, Sparkles } from 'lucide-react';
+import { DefaultAvatar } from './DefaultAvatar';
 
 interface TopBarProps {
   title: string;
@@ -8,34 +9,35 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, onSettingsClick, onMotivationsClick, avatarUrl }: TopBarProps) {
-  const defaultAvatar = "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150&h=150";
-  
   return (
     <header className="fixed top-0 w-full z-50 flex justify-center pointer-events-none">
-      <div className="w-full max-w-[430px] bg-surface/80 backdrop-blur-xl pointer-events-auto shadow-sm">
-        <div className="flex justify-between items-center px-6 h-16 w-full">
-          <div className="flex items-center gap-4">
-            <button 
+      <div className="glass w-full max-w-[430px] pointer-events-auto border-b border-white/40 dark:border-white/10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.04)]">
+        <div className="flex justify-between items-center px-4 h-16 w-full">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
               onClick={onSettingsClick}
-              className="text-primary hover:opacity-80 transition-opacity active:scale-95 duration-200 shrink-0"
+              aria-label="Impostazioni"
+              className="w-11 h-11 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 transition-[background-color,transform] duration-200 active:scale-95 shrink-0"
             >
               <Settings size={24} />
             </button>
-            <button 
+            <button
+              type="button"
               onClick={onMotivationsClick}
-              className="text-primary hover:opacity-80 transition-opacity active:scale-95 duration-200 shrink-0"
-              title="Motivazioni"
+              aria-label="Motivazioni"
+              className="w-11 h-11 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 transition-[background-color,transform] duration-200 active:scale-95 shrink-0"
             >
               <Sparkles size={24} />
             </button>
           </div>
-          <h1 className="font-bold tracking-tight text-lg text-primary truncate px-4">{title}</h1>
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-outline-variant/30 bg-surface-container-highest shrink-0">
-            <img 
-              src={avatarUrl || defaultAvatar} 
-              alt="Profile" 
-              className="w-full h-full object-cover"
-            />
+          <h1 className="font-bold tracking-tight text-lg text-primary truncate px-2">{title}</h1>
+          <div className="w-9 h-9 rounded-full overflow-hidden border border-outline-variant/40 bg-surface-container-highest shrink-0 mr-1">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Profilo" className="w-full h-full object-cover" />
+            ) : (
+              <DefaultAvatar />
+            )}
           </div>
         </div>
       </div>

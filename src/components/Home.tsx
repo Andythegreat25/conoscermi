@@ -1,4 +1,4 @@
-import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Moon, AlertCircle } from 'lucide-react';
+import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Moon, AlertCircle, Wind } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
 import { useMemo } from 'react';
 import { calculateStreak, hasCheckedInToday } from '../utils/streak';
@@ -12,6 +12,7 @@ interface HomeProps {
   eveningReminderEnabled?: boolean;
   onOpenEveningNote?: () => void;
   todayEveningNote?: string;
+  onOpenBreathing?: () => void;
 }
 
 export function Home({
@@ -22,19 +23,20 @@ export function Home({
   entries,
   eveningReminderEnabled,
   onOpenEveningNote,
-  todayEveningNote
+  todayEveningNote,
+  onOpenBreathing
 }: HomeProps) {
   const quotes = [
-    "Ogni giorno è un piccolo passo verso una nuova te.",
-    "La tua crescita è un viaggio, non una destinazione.",
-    "Sii gentile con te stessa oggi.",
-    "Piccoli progressi ogni giorno portano a grandi risultati.",
-    "Il tuo benessere è una priorità, non un lusso.",
-    "Ascolta il tuo cuore, ha sempre qualcosa da dirti.",
-    "Oggi è un'opportunità per ricominciare con amore.",
-    "La forza non viene da ciò che puoi fare, ma dal superare ciò che pensavi di non poter fare.",
-    "Respira. Sei esattamente dove devi essere.",
-    "Coltiva la gratitudine e vedrai fiorire la tua anima."
+    "Un passo piccolo oggi vale più di un piano perfetto rimandato.",
+    "Il tuo percorso ha i suoi tempi. Seguili senza fretta.",
+    "Sii paziente con te: stai imparando mentre vivi.",
+    "Anche i giorni lenti fanno parte dei progressi.",
+    "Prenderti cura di te è un lavoro che si fa ogni giorno, in piccolo.",
+    "Ascolta come stai davvero, poi scegli la cosa più gentile che puoi fare.",
+    "Oggi puoi ricominciare, anche da una cosa sola.",
+    "Quello che hai superato finora ti ha portato fin qui, e sei ancora in piedi.",
+    "Fermati un attimo e respira. Il resto può aspettare cinque minuti.",
+    "Un grazie detto a fine giornata cambia il modo in cui la ricordi."
   ];
 
   const getDailyQuote = () => {
@@ -138,7 +140,7 @@ export function Home({
       <section className="flex gap-4">
         <button
           onClick={onNavigateToDiary}
-          className="flex-1 bg-gradient-to-br from-primary to-primary-container text-white h-14 rounded-full font-semibold text-sm shadow-sm active:scale-95 transition-transform flex items-center justify-center gap-2"
+          className="flex-1 bg-gradient-to-br from-primary to-primary-soft text-on-primary h-14 rounded-full font-semibold text-sm shadow-sm active:scale-95 transition-transform flex items-center justify-center gap-2"
         >
           <PenSquare size={20} />
           Scrivi nel diario
@@ -151,6 +153,26 @@ export function Home({
           Come mi sento?
         </button>
       </section>
+
+      {/* Guided Breathing Card */}
+      {onOpenBreathing && (
+        <section>
+          <button
+            type="button"
+            onClick={onOpenBreathing}
+            className="w-full bg-surface-container-low rounded-lg p-5 flex items-center gap-4 active:scale-[0.98] transition-[transform,background-color] duration-200 hover:bg-surface-container-high text-left"
+          >
+            <div className="w-10 h-10 rounded-full bg-tertiary-container/30 flex items-center justify-center text-tertiary shrink-0">
+              <Wind size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-tertiary">Respirazione guidata</p>
+              <p className="text-on-surface-variant text-sm mt-0.5">Prenditi un momento di calma</p>
+            </div>
+            <span className="text-primary text-lg font-bold shrink-0" aria-hidden="true">›</span>
+          </button>
+        </section>
+      )}
 
       {/* Evening Note Card */}
       {eveningReminderEnabled && onOpenEveningNote && (

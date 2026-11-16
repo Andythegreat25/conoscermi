@@ -1,10 +1,20 @@
 /// <reference lib="webworker" />
 
-import { precacheAndRoute } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { clientsClaim } from 'workbox-core';
 
 declare const self: ServiceWorkerGlobalScope;
 
+// Con registerType 'prompt' l'app chiede alla nuova versione di attivarsi con
+// questo messaggio. Senza gestore la versione nuova resterebbe in attesa finché
+// non si chiudono tutte le schede, e l'app non si aggiornerebbe mai.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
+clientsClaim();
 
 interface ReminderPushPayload {
   title?: string;

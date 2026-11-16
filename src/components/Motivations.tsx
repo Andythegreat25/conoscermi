@@ -1,13 +1,11 @@
-import { Heart, Zap, Sparkles, Leaf, Sun, Pin, Quote, RefreshCw, Loader2, Star, X } from 'lucide-react';
+import { Heart, Zap, Sparkles, Leaf, Sun, Pin, Quote, Star, X } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 
 interface QuoteData {
-  id: string | number;
+  id: string;
   text: string;
-  author: string;
   category: string;
   icon: string;
-  image?: string;
 }
 
 const CATEGORIES = [
@@ -23,77 +21,87 @@ const CATEGORIES = [
   'Crescita'
 ];
 
-const CATEGORY_MAP: Record<string, string> = {
-  'peace': 'Pace interiore',
-  'strength': 'Forza',
-  'patience': 'Pazienza',
-  'courage': 'Coraggio',
-  'mindfulness': 'Consapevolezza',
-  'hope': 'Speranza',
-  'love': 'Amore proprio',
-  'growth': 'Crescita'
+const CATEGORY_ICONS: Record<string, string> = {
+  'Pace interiore': 'leaf',
+  'Forza': 'zap',
+  'Pazienza': 'pin',
+  'Coraggio': 'sparkles',
+  'Consapevolezza': 'sun',
+  'Speranza': 'sparkles',
+  'Amore proprio': 'heart',
+  'Crescita': 'leaf',
 };
 
-const ICONS = ['heart', 'zap', 'sparkles', 'leaf', 'sun', 'pin'];
+// Frasi scritte per l'app, senza dipendere dalla rete: funzionano anche offline.
+// Il linguaggio è volutamente neutro, così vale per chiunque le legga.
+const QUOTES_BY_CATEGORY: Record<string, string[]> = {
+  'Pace interiore': [
+    "Non devi risolvere tutto stasera. Respira e lascia che il resto aspetti domani.",
+    "Il silenzio dopo una giornata piena fa bene, anche quando sembra di non fare niente.",
+    "Quando la testa corre, rallenta il respiro. Il resto di solito lo segue.",
+    "Un posto tranquillo dentro di te esiste già. Spesso bastano cinque minuti fermi per ritrovarlo.",
+    "Spegni lo schermo, apri una finestra e resta un momento con quello che senti.",
+  ],
+  'Forza': [
+    "Hai già superato giorni che sembravano troppo lunghi. Anche questo passerà.",
+    "A volte la forza di oggi è alzarsi, lavarsi la faccia e provarci. Può bastare.",
+    "Chiedere aiuto richiede più forza che stringere i denti da soli.",
+    "Ogni volta che hai ricominciato, hai trovato più risorse di quante ne credevi.",
+    "Fermarsi a riposare fa parte del cammino quanto camminare.",
+  ],
+  'Pazienza': [
+    "Le cose che contano crescono piano. Una radice non si vede finché non regge un albero.",
+    "Oggi basta un passo piccolo. Quelli grandi arrivano dopo, quando hai ripreso fiato.",
+    "Una ferita ha bisogno dei suoi tempi, e i tuoi sono quelli giusti per te.",
+    "Se oggi non è successo niente di visibile, qualcosa dentro è cambiato lo stesso.",
+    "Aspettare con calma è una scelta, e spesso la più saggia.",
+  ],
+  'Coraggio': [
+    "Il coraggio si presenta spesso come un piccolo sì detto con la voce che trema.",
+    "Puoi avere paura e fare comunque la cosa giusta per te.",
+    "Ogni volta che racconti come stai davvero, apri una porta che prima era chiusa.",
+    "Provare e sbagliare insegna più che restare fermi a immaginare come andrà.",
+    "Dire «ho bisogno di una pausa» è già un atto di coraggio.",
+  ],
+  'Consapevolezza': [
+    "Prima di reagire, chiediti cosa stai sentendo. Dare un nome a un'emozione la rende più leggera.",
+    "Guarda il cielo per un minuto intero. Il resto della lista può aspettare.",
+    "I pensieri passano come nuvole. Puoi osservarli senza seguirli.",
+    "Scrivere quello che provi mostra cose che nella testa restavano confuse.",
+    "Senti i piedi a terra. È il modo più semplice per tornare qui.",
+  ],
+  'Speranza': [
+    "Le giornate storte finiscono. Domani si riparte da un foglio pulito.",
+    "Dopo la notte più lunga, il mattino arriva lo stesso.",
+    "Quello che oggi pesa potresti ricordarlo, tra un anno, come il giorno in cui hai cambiato rotta.",
+    "Qualche buona notizia è già in cammino, anche se ancora non la vedi.",
+    "Un giorno ripenserai a questo periodo sapendo di aver tenuto duro.",
+  ],
+  'Amore proprio': [
+    "Parlati come parleresti a un amico che sta passando per lo stesso momento.",
+    "Meriti gentilezza anche nei giorni in cui non hai concluso niente.",
+    "Prenderti cura di te è un compito vero, e puoi metterlo in agenda.",
+    "Puoi volerti bene anche mentre stai ancora cambiando.",
+    "Oggi hai fatto quello che potevi, e per oggi è abbastanza.",
+  ],
+  'Crescita': [
+    "Ogni pagina che scrivi nel diario è un punto di partenza per capirti meglio.",
+    "Crescere somiglia a salire una scala a chiocciola: ripassi dagli stessi punti, ma più in alto.",
+    "Gli errori di oggi sono appunti per la versione di te che arriverà domani.",
+    "Un giorno in più di costanza vale più di uno slancio grande che dura una settimana.",
+    "Cambiare un'abitudine alla volta funziona meglio che cambiare tutto insieme.",
+  ],
+};
 
-const FALLBACK_QUOTES: QuoteData[] = [
-  {
-    id: 'fb-1',
-    text: "La pace viene da dentro. Non cercarla fuori.",
-    author: "Buddha",
-    category: "Pace interiore",
-    icon: "leaf"
-  },
-  {
-    id: 'fb-2',
-    text: "Il successo non è definitivo, il fallimento non è fatale: è il coraggio di continuare che conta.",
-    author: "Winston Churchill",
-    category: "Coraggio",
-    icon: "zap"
-  },
-  {
-    id: 'fb-3',
-    text: "La felicità non è qualcosa di pronto. Viene dalle tue azioni.",
-    author: "Dalai Lama",
-    category: "Amore proprio",
-    icon: "heart"
-  },
-  {
-    id: 'fb-4',
-    text: "Sii il cambiamento che vuoi vedere nel mondo.",
-    author: "Mahatma Gandhi",
-    category: "Crescita",
-    icon: "sparkles"
-  },
-  {
-    id: 'fb-5',
-    text: "Tutto ciò che abbiamo è il presente.",
-    author: "Marco Aurelio",
-    category: "Consapevolezza",
-    icon: "sun"
-  },
-  {
-    id: 'fb-6',
-    text: "La pazienza è amara, ma il suo frutto è dolce.",
-    author: "Jean-Jacques Rousseau",
-    category: "Pazienza",
-    icon: "pin"
-  },
-  {
-    id: 'fb-7',
-    text: "Non è mai troppo tardi per essere ciò che avresti potuto essere.",
-    author: "George Eliot",
-    category: "Speranza",
-    icon: "sparkles"
-  },
-  {
-    id: 'fb-8',
-    text: "La forza non deriva dalla capacità fisica. Deriva da una volontà indomita.",
-    author: "Mahatma Gandhi",
-    category: "Forza",
-    icon: "zap"
-  }
-];
+const QUOTES: QuoteData[] = Object.entries(QUOTES_BY_CATEGORY).flatMap(
+  ([category, texts], categoryIndex) =>
+    texts.map((text, i) => ({
+      id: `q-${categoryIndex * 10 + i + 1}`,
+      text,
+      category,
+      icon: CATEGORY_ICONS[category] ?? 'quote',
+    }))
+);
 
 interface MotivationsProps {
   onClose?: () => void;
@@ -101,20 +109,25 @@ interface MotivationsProps {
 
 export function Motivations({ onClose }: MotivationsProps) {
   const [activeCategory, setActiveCategory] = useState<string>('Tutte');
-  const [quotes, setQuotes] = useState<QuoteData[]>(FALLBACK_QUOTES);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const quotes = QUOTES;
 
   // Load favorites from localStorage
   useEffect(() => {
     const savedFavorites = localStorage.getItem('favorite_quotes');
     if (savedFavorites) {
       try {
-        setFavorites(JSON.parse(savedFavorites));
+        const saved: string[] = JSON.parse(savedFavorites);
+        // Tiene solo i preferiti che esistono ancora nell'archivio attuale
+        const validIds = new Set(QUOTES.map(q => q.id));
+        setFavorites(saved.filter(id => validIds.has(id)));
       } catch (e) {
         console.error("Failed to parse favorites", e);
       }
     }
+    // Le frasi non arrivano più da un servizio esterno: elimina la vecchia cache
+    localStorage.removeItem('cached_quotes');
+    localStorage.removeItem('cached_quotes_date');
   }, []);
 
   // Save favorites to localStorage
@@ -122,112 +135,27 @@ export function Motivations({ onClose }: MotivationsProps) {
     localStorage.setItem('favorite_quotes', JSON.stringify(favorites));
   }, [favorites]);
 
-  const fetchQuotes = async () => {
-    setIsLoading(true);
-    const today = new Date().toISOString().split('T')[0];
-
-    // ── #9 Cache quote: controlla cache giornaliera prima del fetch ───────────
-    const cachedDate = localStorage.getItem('cached_quotes_date');
-    const cachedData = localStorage.getItem('cached_quotes');
-    if (cachedDate === today && cachedData) {
-      try {
-        setQuotes(JSON.parse(cachedData));
-        setIsLoading(false);
-        return;
-      } catch { /* cache corrotta, procedi con il fetch */ }
-    }
-
-    try {
-      const response = await fetch('https://type.fit/api/quotes').catch(() => null);
-
-      if (response && response.ok) {
-        const data = await response.json();
-
-        const transformed: QuoteData[] = data.slice(0, 100).map((q: any, index: number) => {
-          const text = q.text;
-          const author = q.author?.replace(', type.fit', '') || 'Anonimo';
-
-          let category = 'Crescita';
-          if (text.toLowerCase().includes('peace') || text.toLowerCase().includes('calm')) category = 'Pace interiore';
-          else if (text.toLowerCase().includes('strength') || text.toLowerCase().includes('power')) category = 'Forza';
-          else if (text.toLowerCase().includes('wait') || text.toLowerCase().includes('patience')) category = 'Pazienza';
-          else if (text.toLowerCase().includes('fear') || text.toLowerCase().includes('courage')) category = 'Coraggio';
-          else if (text.toLowerCase().includes('mind') || text.toLowerCase().includes('present')) category = 'Consapevolezza';
-          else if (text.toLowerCase().includes('hope') || text.toLowerCase().includes('light')) category = 'Speranza';
-          else if (text.toLowerCase().includes('love') || text.toLowerCase().includes('self')) category = 'Amore proprio';
-          else {
-            const randomCats = CATEGORIES.slice(2);
-            category = randomCats[index % randomCats.length];
-          }
-
-          return {
-            id: `api-${index}`,
-            text,
-            author,
-            category,
-            icon: ICONS[index % ICONS.length],
-            image: index % 10 === 0 ? `https://picsum.photos/seed/quote-${index}/800/600` : undefined
-          };
-        });
-
-        setQuotes(transformed);
-        // Salva in cache con la data di oggi
-        try {
-          localStorage.setItem('cached_quotes', JSON.stringify(transformed));
-          localStorage.setItem('cached_quotes_date', today);
-        } catch { /* localStorage pieno, ignora */ }
-      } else {
-        // Fetch fallito: usa cache precedente se disponibile, altrimenti fallback
-        if (cachedData) {
-          try {
-            setQuotes(JSON.parse(cachedData));
-            return;
-          } catch { /* noop */ }
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch quotes, using fallbacks", err);
-      // Usa cache precedente se disponibile
-      if (cachedData) {
-        try {
-          setQuotes(JSON.parse(cachedData));
-          return;
-        } catch { /* noop */ }
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchQuotes();
-  }, []);
-
   const toggleFavorite = (id: string | number) => {
-    setFavorites(prev => 
-      prev.includes(id.toString()) 
-        ? prev.filter(fid => fid !== id.toString()) 
+    setFavorites(prev =>
+      prev.includes(id.toString())
+        ? prev.filter(fid => fid !== id.toString())
         : [...prev, id.toString()]
     );
   };
 
   const dailyQuotes = useMemo(() => {
-    if (quotes.length === 0) return [];
     const today = new Date();
     const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-    
+
     const random = (s: number) => {
       const x = Math.sin(s) * 10000;
       return x - Math.floor(x);
     };
 
-    const shuffled = [...quotes].sort((a, b) => random(seed + Number(a.id.toString().split('-')[1])) - random(seed + Number(b.id.toString().split('-')[1])));
-    
-    // Ensure hero has a nice image
-    const heroQuote = { ...shuffled[0] };
-    heroQuote.image = `https://images.unsplash.com/photo-1499209974431-9dac3adaf471?auto=format&fit=crop&q=80&w=800&seed=${seed}`;
-    
-    return [heroQuote, ...shuffled.slice(1, 6)];
+    const numericId = (q: QuoteData) => Number(q.id.split('-')[1]);
+    const shuffled = [...quotes].sort((a, b) => random(seed + numericId(a)) - random(seed + numericId(b)));
+
+    return shuffled.slice(0, 6);
   }, [quotes]);
 
   const filteredQuotes = useMemo(() => {
@@ -250,15 +178,6 @@ export function Motivations({ onClose }: MotivationsProps) {
     }
   };
 
-  if (isLoading && quotes.length === 0) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-4">
-        <Loader2 className="text-primary animate-spin" size={40} />
-        <p className="text-on-surface-variant font-medium">Caricamento saggezza...</p>
-      </div>
-    );
-  }
-
   const [heroQuote, bento1, bento2, wideQuote, bottom1, bottom2] = dailyQuotes;
 
   return (
@@ -267,13 +186,14 @@ export function Motivations({ onClose }: MotivationsProps) {
         <div>
           <h2 className="text-4xl font-extrabold tracking-tight text-primary mb-2">Motivazioni</h2>
           <p className="text-on-surface-variant font-medium leading-relaxed">
-            Trova la tua forza interiore attraverso parole di saggezza e pace.
+            Poche parole per ritrovare calma e forza quando ne hai bisogno.
           </p>
         </div>
         {onClose && (
-          <button 
+          <button
             onClick={onClose}
-            className="p-2 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+            aria-label="Chiudi"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
           >
             <X size={24} />
           </button>
@@ -300,33 +220,25 @@ export function Motivations({ onClose }: MotivationsProps) {
       {activeCategory === 'Tutte' ? (
         <div className="grid grid-cols-1 gap-6">
           {/* Large Card Feature */}
-          <div className="relative group rounded-lg overflow-hidden h-[360px] bg-gradient-to-br from-primary to-primary-container p-8 flex flex-col justify-end shadow-[0_12px_32px_rgba(140,78,55,0.15)]">
+          <div className="relative group rounded-lg overflow-hidden min-h-[320px] bg-gradient-to-br from-primary to-primary-soft p-8 flex flex-col justify-end shadow-[0_12px_32px_rgba(140,78,55,0.15)]">
             <div className="absolute top-6 right-6 z-20">
-              <button 
+              <button
                 onClick={() => toggleFavorite(heroQuote.id)}
+                aria-label="Aggiungi ai preferiti"
                 className={`w-12 h-12 rounded-full backdrop-blur-md flex items-center justify-center active:scale-90 transition-all ${
-                  favorites.includes(heroQuote.id.toString()) 
-                    ? 'bg-primary text-white' 
-                    : 'bg-white/20 text-white'
+                  favorites.includes(heroQuote.id.toString())
+                    ? 'bg-on-primary text-primary'
+                    : 'bg-on-primary/20 text-on-primary'
                 }`}
               >
                 <Heart size={24} fill={favorites.includes(heroQuote.id.toString()) ? 'currentColor' : 'none'} />
               </button>
             </div>
-            <div className="absolute top-0 left-0 w-full h-full opacity-40 pointer-events-none">
-              <img 
-                src={heroQuote.image} 
-                alt="Background" 
-                className="w-full h-full object-cover mix-blend-overlay"
-                referrerPolicy="no-referrer"
-              />
-            </div>
             <div className="relative z-10 space-y-4">
-              <Quote size={40} className="text-white/40" />
-              <h3 className="text-white text-3xl font-bold leading-tight">{heroQuote.text}</h3>
-              <div className="flex items-center justify-between pt-2">
-                <p className="text-white/80 text-sm font-medium uppercase tracking-widest">{heroQuote.category}</p>
-                <p className="text-white/60 text-xs italic">— {heroQuote.author}</p>
+              <Quote size={40} className="text-on-primary/40" />
+              <h3 className="text-on-primary text-3xl font-bold leading-tight">{heroQuote.text}</h3>
+              <div className="pt-2">
+                <p className="text-on-primary/80 text-sm font-medium uppercase tracking-widest">{heroQuote.category}</p>
               </div>
             </div>
           </div>
@@ -337,17 +249,15 @@ export function Motivations({ onClose }: MotivationsProps) {
               <div key={q.id} className={`${i === 0 ? 'bg-surface-container-low' : 'bg-secondary-container/30'} p-6 rounded-lg aspect-square flex flex-col justify-between transition-all hover:bg-opacity-80 group`}>
                 <div className="flex justify-between items-start">
                   {renderIcon(q.icon, i === 0 ? "text-secondary" : "text-primary")}
-                  <button 
+                  <button
                     onClick={() => toggleFavorite(q.id)}
+                    aria-label="Aggiungi ai preferiti"
                     className={`transition-colors ${favorites.includes(q.id.toString()) ? 'text-primary' : 'text-outline group-hover:text-primary'}`}
                   >
                     <Heart size={20} fill={favorites.includes(q.id.toString()) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                <div className="space-y-2">
-                  <p className={`${i === 0 ? 'text-primary' : 'text-on-secondary-container'} font-bold text-lg leading-snug line-clamp-4`}>{q.text}</p>
-                  <p className="text-[10px] text-on-surface-variant/60 italic">— {q.author}</p>
-                </div>
+                <p className={`${i === 0 ? 'text-primary' : 'text-on-secondary-container'} font-bold text-lg leading-snug line-clamp-5`}>{q.text}</p>
               </div>
             ))}
           </div>
@@ -357,12 +267,10 @@ export function Motivations({ onClose }: MotivationsProps) {
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
               {renderIcon(wideQuote.icon, "text-primary", 28)}
             </div>
-            <div className="flex-1 space-y-2">
-              <p className="text-primary font-bold text-xl leading-tight italic">"{wideQuote.text}"</p>
-              <p className="text-xs text-on-surface-variant/60">— {wideQuote.author}</p>
-            </div>
-            <button 
+            <p className="flex-1 text-primary font-bold text-xl leading-tight italic">"{wideQuote.text}"</p>
+            <button
               onClick={() => toggleFavorite(wideQuote.id)}
+              aria-label="Aggiungi ai preferiti"
               className={`absolute top-4 right-4 transition-colors ${favorites.includes(wideQuote.id.toString()) ? 'text-primary' : 'text-outline-variant group-hover:text-primary'}`}
             >
               <Heart size={20} fill={favorites.includes(wideQuote.id.toString()) ? 'currentColor' : 'none'} />
@@ -374,12 +282,10 @@ export function Motivations({ onClose }: MotivationsProps) {
             {[bottom1, bottom2].map((q, i) => (
               <div key={q.id} className={`${i === 0 ? 'bg-surface-container-highest/40' : 'bg-primary-container/20'} p-6 rounded-lg flex flex-col justify-between aspect-[3/4] relative group`}>
                 {renderIcon(q.icon, i === 0 ? "text-on-surface-variant" : "text-primary")}
-                <div className="space-y-2">
-                  <p className={`${i === 0 ? 'text-on-surface' : 'text-primary'} font-bold text-lg leading-snug line-clamp-5`}>{q.text}</p>
-                  <p className="text-[10px] text-on-surface-variant/60 italic">— {q.author}</p>
-                </div>
-                <button 
+                <p className={`${i === 0 ? 'text-on-surface' : 'text-primary'} font-bold text-lg leading-snug line-clamp-6 pb-8`}>{q.text}</p>
+                <button
                   onClick={() => toggleFavorite(q.id)}
+                  aria-label="Aggiungi ai preferiti"
                   className={`absolute bottom-6 right-6 transition-colors ${favorites.includes(q.id.toString()) ? 'text-primary' : 'text-outline group-hover:text-primary'}`}
                 >
                   <Heart size={20} fill={favorites.includes(q.id.toString()) ? 'currentColor' : 'none'} />
@@ -395,7 +301,11 @@ export function Motivations({ onClose }: MotivationsProps) {
               <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto text-outline-variant">
                 <Star size={32} />
               </div>
-              <p className="text-on-surface-variant font-medium">Nessuna citazione trovata in questa categoria.</p>
+              <p className="text-on-surface-variant font-medium">
+                {activeCategory === 'Preferiti'
+                  ? 'Tocca il cuore su una frase per ritrovarla qui.'
+                  : 'Nessuna frase in questa categoria.'}
+              </p>
             </div>
           ) : (
             filteredQuotes?.map(quote => (
@@ -405,17 +315,15 @@ export function Motivations({ onClose }: MotivationsProps) {
                     {renderIcon(quote.icon, "text-primary")}
                     <span className="text-[10px] font-bold uppercase tracking-widest text-primary/60">{quote.category}</span>
                   </div>
-                  <button 
+                  <button
                     onClick={() => toggleFavorite(quote.id)}
+                    aria-label="Aggiungi ai preferiti"
                     className={`transition-colors ${favorites.includes(quote.id.toString()) ? 'text-primary' : 'text-outline group-hover:text-primary'}`}
                   >
                     <Heart size={20} fill={favorites.includes(quote.id.toString()) ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                <div className="space-y-3">
-                  <p className="text-on-surface font-bold text-xl leading-snug">"{quote.text}"</p>
-                  <p className="text-sm text-on-surface-variant italic">— {quote.author}</p>
-                </div>
+                <p className="text-on-surface font-bold text-xl leading-snug">"{quote.text}"</p>
               </div>
             ))
           )}
@@ -424,4 +332,3 @@ export function Motivations({ onClose }: MotivationsProps) {
     </div>
   );
 }
-

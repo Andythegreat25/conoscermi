@@ -5,9 +5,12 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 
   --color-primary: #8c4e37;
+  --color-on-primary: #ffffff;
+  --color-primary-soft: #d98e73;
   --color-primary-container: #d98e73;
   --color-on-primary-container: #5c2814;
   --color-secondary: #566342;
+  --color-on-secondary: #ffffff;
   --color-secondary-container: #d7e5bb;
   --color-on-secondary-container: #5a6745;
   --color-tertiary: #146964;
@@ -23,6 +26,7 @@
   --color-outline: #85736d;
   --color-outline-variant: #d8c2bb;
   --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
   --color-error-container: #ffdad6;
 
   --radius-lg: 2rem;
@@ -32,9 +36,12 @@
 @layer base {
   .dark {
     --color-primary: #ffb59d;
+    --color-on-primary: #4a1d0c;
+    --color-primary-soft: #e8a58c;
     --color-primary-container: #723722;
     --color-on-primary-container: #ffdbd0;
     --color-secondary: #becba8;
+    --color-on-secondary: #263218;
     --color-secondary-container: #3f4b2c;
     --color-on-secondary-container: #dae7c3;
     --color-tertiary: #8bd3cc;
@@ -50,7 +57,21 @@
     --color-outline: #a08d87;
     --color-outline-variant: #53433e;
     --color-error: #ffb4ab;
+    --color-on-error: #5c0004;
     --color-error-container: #93000a;
+  }
+}
+
+/* Vetro satinato condiviso da barra superiore e inferiore */
+.glass {
+  background-color: color-mix(in srgb, var(--color-surface) 62%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breath-orb {
+    transition-duration: 0ms !important;
   }
 }
 

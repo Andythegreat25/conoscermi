@@ -11,9 +11,9 @@ export function SplashScreen() {
           duration: 0.8, 
           ease: [0.16, 1, 0.3, 1] 
         }}
-        className="w-24 h-24 bg-gradient-to-br from-primary to-primary-container rounded-[2rem] flex items-center justify-center shadow-2xl mb-8"
+        className="w-24 h-24 bg-gradient-to-br from-primary to-primary-soft rounded-[2rem] flex items-center justify-center shadow-2xl mb-8"
       >
-        <Leaf className="text-white" size={48} />
+        <Leaf className="text-on-primary" size={48} />
       </motion.div>
       
       <motion.div

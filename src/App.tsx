@@ -20,6 +20,8 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw } from 'lucide-react';
 import { saveReminderSettings, saveEveningReminderSettings } from './utils/db';
 import { hasCheckedInToday } from './utils/streak';
+import { parseBackup, mergeEntries } from './utils/backup';
+import { Breathing } from './components/Breathing';
 import { localDateKey, recordReminderActivity, syncPushPreferences } from './utils/push';
 
 export default function App() {
@@ -37,6 +39,10 @@ export default function App() {
         setInterval(() => {
           r.update();
         }, 15 * 60 * 1000);
+        // Su telefono i timer in background si fermano: controlla anche quando l'app torna in primo piano.
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') r.update().catch(() => {});
+        });
       }
     },
   });
@@ -55,24 +61,6 @@ export default function App() {
       setOfflineReady(false);
     }
   }, [offlineReady, setOfflineReady]);
-
-  useEffect(() => {
-    if (needRefresh) {
-      toast('Aggiornamento disponibile', {
-        description: 'È disponibile una nuova versione dell\'app. Ricarica per aggiornare.',
-        icon: <RefreshCw className="animate-spin text-primary" size={20} />,
-        duration: Infinity,
-        action: {
-          label: 'Ricarica ora',
-          onClick: () => updateServiceWorker(true),
-        },
-        cancel: {
-          label: 'Più tardi',
-          onClick: () => setNeedRefresh(false),
-        },
-      });
-    }
-  }, [needRefresh, setNeedRefresh, updateServiceWorker]);
 
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
 
@@ -117,6 +105,7 @@ export default function App() {
   const [showMotivations, setShowMotivations] = useState(false);
   const [showQuickJournal, setShowQuickJournal] = useState(false);
   const [showEveningNote, setShowEveningNote] = useState(false);
+  const [showBreathing, setShowBreathing] = useState(false);
   const [editingEntry, setEditingEntry] = useState<DiaryEntry | null>(null);
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [remindersEnabled, setRemindersEnabled] = useState(false);
@@ -127,6 +116,25 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Aggiornamento automatico: appena c'è una nuova versione la applica e ricarica.
+  // Se stai scrivendo (diario o nota serale) aspetta, per non farti perdere il testo.
+  const isWriting = showQuickJournal || showEveningNote;
+  useEffect(() => {
+    if (!needRefresh) return;
+    if (isWriting) {
+      toast('Aggiornamento pronto', {
+        id: 'update-ready',
+        description: 'L\'app si aggiornerà appena finisci di scrivere.',
+        icon: <RefreshCw className="text-primary" size={20} />,
+        duration: Infinity,
+      });
+      return;
+    }
+    toast.dismiss('update-ready');
+    toast.loading('Aggiornamento in corso…', { id: 'update-applying' });
+    updateServiceWorker(true);
+  }, [needRefresh, isWriting, updateServiceWorker]);
 
   // Check for existing PIN and load initial data
   useEffect(() => {
@@ -175,6 +183,12 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // A ogni cambio di vista (tab, diario, impostazioni, motivazioni) si riparte dall'alto,
+  // altrimenti la pagina resta alla posizione di scroll della schermata precedente.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname, showQuickJournal, showSettings, showMotivations]);
 
   // Save entries to localStorage whenever they change
   useEffect(() => {
@@ -338,8 +352,11 @@ export default function App() {
         console.warn('Unable to sync check-in date for push reminders', error)
       );
     }
+    // Chiude la tastiera, che altrimenti può restare aperta e bloccare lo scroll su mobile
+    (document.activeElement as HTMLElement | null)?.blur?.();
     setShowQuickJournal(false);
     navigate('/diary');
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   };
 
   /** Save/update the evening note for today. */
@@ -386,6 +403,20 @@ export default function App() {
     toast.success('Nota serale salvata 🌙');
   };
 
+  /** Elimina un singolo pensiero. Lo stato viene salvato in localStorage dall'effetto su `entries`. */
+  const handleDeleteEntry = (id: string) => {
+    setEntries(prev => prev.filter(e => e.id !== id));
+    toast.success('Pensiero eliminato');
+  };
+
+  /** Importa un backup JSON: valida le voci e le unisce a quelle presenti, senza ricaricare l'app. */
+  const handleImportEntries = (raw: unknown): { added: number; skipped: number } => {
+    const { valid, skipped } = parseBackup(raw);
+    const { merged, added } = mergeEntries(entries, valid);
+    if (added > 0) setEntries(merged);
+    return { added, skipped };
+  };
+
   const handleLogout = () => {
     setIsUnlocked(false);
   };
@@ -426,6 +457,8 @@ export default function App() {
           onThemeChange={handleThemeChange}
           avatarUrl={avatarUrl}
           onAvatarChange={handleAvatarChange}
+          entries={entries}
+          onImportEntries={handleImportEntries}
         />
       );
     }
@@ -463,6 +496,7 @@ export default function App() {
             eveningReminderEnabled={eveningReminderEnabled}
             onOpenEveningNote={() => setShowEveningNote(true)}
             todayEveningNote={todayEveningNote}
+            onOpenBreathing={() => setShowBreathing(true)}
           />
         } />
         <Route path="/home" element={<Navigate to="/" replace />} />
@@ -478,6 +512,7 @@ export default function App() {
               setEditingEntry(entry);
               setShowQuickJournal(true);
             }}
+            onDeleteEntry={handleDeleteEntry}
           />
         } />
         <Route path="/journey" element={<Journey entries={entries} />} />
@@ -522,6 +557,8 @@ export default function App() {
             onClose={() => setShowEveningNote(false)}
           />
         )}
+
+        {showBreathing && <Breathing onClose={() => setShowBreathing(false)} />}
 
         {!showSettings && !showQuickJournal && !showMotivations && (
           <BottomNav

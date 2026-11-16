@@ -133,7 +133,7 @@ export function EveningNote({ existingNote, onSave, onClose }: EveningNoteProps)
             <button
               onClick={handleSave}
               disabled={!note.trim()}
-              className="flex-1 h-12 rounded-full bg-gradient-to-r from-tertiary to-secondary text-white font-semibold text-sm active:scale-95 transition-transform disabled:opacity-40 flex items-center justify-center gap-2"
+              className="flex-1 h-12 rounded-full bg-gradient-to-r from-tertiary to-secondary text-on-secondary font-semibold text-sm active:scale-95 transition-transform disabled:opacity-40 flex items-center justify-center gap-2"
             >
               <Send size={16} />
               {existingNote ? 'Aggiorna' : 'Salva'}

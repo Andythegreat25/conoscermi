@@ -2,6 +2,8 @@ import { Palette, Cloud, Database, Download, Upload, Trash2, Leaf, ArrowLeft, Be
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { toast } from 'sonner';
 import { DiaryEntry } from '../types';
+import { ConfirmDialog } from './ConfirmDialog';
+import { DefaultAvatar } from './DefaultAvatar';
 
 interface StorageBreakdown {
   total: string;
@@ -28,6 +30,8 @@ interface SettingsProps {
   onThemeChange: (theme: 'light' | 'dark') => void;
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
+  entries: DiaryEntry[];
+  onImportEntries: (raw: unknown) => { added: number; skipped: number };
 }
 
 export function Settings({
@@ -46,12 +50,15 @@ export function Settings({
   theme,
   onThemeChange,
   avatarUrl,
-  onAvatarChange
+  onAvatarChange,
+  entries,
+  onImportEntries
 }: SettingsProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [storageBreakdown, setStorageBreakdown] = useState<StorageBreakdown | null>(null);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<'clear' | 'pin' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,9 +68,12 @@ export function Settings({
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
-    // ── #10 Storage breakdown dettagliato ────────────────────────────────────
-    const entriesStr = localStorage.getItem('diary_entries') || '';
+  // ── #10 Storage breakdown dettagliato, ricalcolato quando cambiano voci o avatar ──
+  useEffect(() => {
+    const entriesStr = JSON.stringify(entries);
     const fullSettingsStr = localStorage.getItem('app_settings') || '';
 
     let avatarKB = 0;
@@ -85,19 +95,14 @@ export function Settings({
     const fmt = (kb: number) =>
       kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(kb, 0).toFixed(1)} KB`;
 
-    let entryCount = 0;
-    try { entryCount = JSON.parse(entriesStr).length; } catch { /* noop */ }
-
     setStorageBreakdown({
       total: fmt(totalKB),
       diary: fmt(entriesKB),
       avatar: fmt(avatarKB),
       settings: fmt(settingsKB),
-      entryCount,
+      entryCount: entries.length,
     });
-
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
+  }, [entries, avatarUrl]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -232,44 +237,41 @@ export function Settings({
   const handleImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const input = e.target;
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onload = () => {
       try {
-        const imported: DiaryEntry[] = JSON.parse(reader.result as string);
-        if (!Array.isArray(imported)) throw new Error('Formato non valido');
-        // Merge: keep existing entries, add only those not already present (by id)
-        const existing: DiaryEntry[] = JSON.parse(localStorage.getItem('diary_entries') || '[]');
-        const existingIds = new Set(existing.map(e => e.id));
-        const newEntries = imported.filter(e => !existingIds.has(e.id));
-        const merged = [...existing, ...newEntries].sort((a, b) => b.timestamp - a.timestamp);
-        localStorage.setItem('diary_entries', JSON.stringify(merged));
-        toast.success(`Importate ${newEntries.length} nuove voci ✓`, {
-          description: newEntries.length === 0 ? 'Tutte le voci erano già presenti.' : undefined,
-        });
-        // Reset the input so the same file can be selected again
-        e.target.value = '';
-        setTimeout(() => window.location.reload(), 1200);
+        const { added, skipped } = onImportEntries(JSON.parse(reader.result as string));
+        const notes: string[] = [];
+        if (added === 0) notes.push('Tutte le voci erano già presenti.');
+        if (skipped > 0) notes.push(`${skipped} ${skipped === 1 ? 'voce non valida ignorata' : 'voci non valide ignorate'}.`);
+        toast.success(
+          added === 1 ? 'Importata 1 nuova voce ✓' : `Importate ${added} nuove voci ✓`,
+          { description: notes.length > 0 ? notes.join(' ') : undefined },
+        );
       } catch {
         toast.error('File non valido. Assicurati di usare un backup esportato da Conoscermi.');
-        e.target.value = '';
+      } finally {
+        // Permette di riselezionare lo stesso file
+        input.value = '';
       }
+    };
+    reader.onerror = () => {
+      toast.error('Impossibile leggere il file.');
+      input.value = '';
     };
     reader.readAsText(file);
   };
 
   const handleClearAll = () => {
-    if (confirm('Sei sicuro di voler cancellare tutti i dati? Questa azione è irreversibile.')) {
-      localStorage.removeItem('diary_entries');
-      localStorage.removeItem('app_settings');
-      window.location.reload();
-    }
+    localStorage.removeItem('diary_entries');
+    localStorage.removeItem('app_settings');
+    window.location.reload();
   };
 
   const handleChangePin = () => {
-    if (confirm('Vuoi cambiare il tuo PIN? Verrai disconnesso per impostarne uno nuovo.')) {
-      localStorage.removeItem('user_pin');
-      window.location.reload();
-    }
+    localStorage.removeItem('user_pin');
+    window.location.reload();
   };
 
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -286,8 +288,6 @@ export function Settings({
   const triggerAvatarUpload = () => {
     fileInputRef.current?.click();
   };
-
-  const defaultAvatar = "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150&h=150";
 
   const hourOptions = Array.from({ length: 17 }, (_, i) => i + 7);
 
@@ -317,15 +317,15 @@ export function Settings({
         <div className="flex items-center gap-6">
           <div className="relative group">
             <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-primary/20 bg-surface-container-highest shrink-0">
-              <img
-                src={avatarUrl || defaultAvatar}
-                alt="Profile"
-                className="w-full h-full object-cover"
-              />
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profilo" className="w-full h-full object-cover" />
+              ) : (
+                <DefaultAvatar />
+              )}
             </div>
             <button
               onClick={triggerAvatarUpload}
-              className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+              className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
             >
               <Camera size={16} />
             </button>
@@ -373,8 +373,8 @@ export function Settings({
             <h3 className="font-bold text-lg">Sicurezza</h3>
           </div>
           <button
-            onClick={handleChangePin}
-            className="w-full flex items-center justify-between p-4 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-white transition-colors"
+            onClick={() => setPendingConfirm('pin')}
+            className="w-full flex items-center justify-between p-4 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container-highest transition-colors"
           >
             <span className="font-medium">Cambia PIN di accesso</span>
             <ArrowLeft size={20} className="rotate-180 text-outline-variant" />
@@ -471,7 +471,7 @@ export function Settings({
             >
               <span className="font-medium">Tema Chiaro</span>
               <div className={`w-5 h-5 rounded-full border-2 ${theme === 'light' ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
-                {theme === 'light' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full"></div></div>}
+                {theme === 'light' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-on-primary rounded-full"></div></div>}
               </div>
             </button>
             <button
@@ -484,7 +484,7 @@ export function Settings({
             >
               <span className="font-medium">Tema Scuro</span>
               <div className={`w-5 h-5 rounded-full border-2 ${theme === 'dark' ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
-                {theme === 'dark' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full"></div></div>}
+                {theme === 'dark' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-on-primary rounded-full"></div></div>}
               </div>
             </button>
           </div>
@@ -559,7 +559,7 @@ export function Settings({
             <button
               onClick={handleExportPDF}
               disabled={isExportingPDF}
-              className="flex items-center justify-center gap-3 bg-primary text-white font-bold py-4 px-6 rounded-full hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center justify-center gap-3 bg-primary text-on-primary font-bold py-4 px-6 rounded-full hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
             >
               {isExportingPDF ? (
                 <RefreshCw size={20} className="animate-spin" />
@@ -590,7 +590,7 @@ export function Settings({
               className="hidden"
             />
             <button
-              onClick={handleClearAll}
+              onClick={() => setPendingConfirm('clear')}
               className="flex items-center justify-center gap-3 bg-error-container text-error font-bold py-4 px-6 rounded-full hover:bg-error/10 transition-all active:scale-95"
             >
               <Trash2 size={20} />
@@ -604,8 +604,8 @@ export function Settings({
 
         {/* About */}
         <div className="py-12 px-8 flex flex-col items-center text-center space-y-4">
-          <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary-container rounded-3xl rotate-12 flex items-center justify-center shadow-lg">
-            <Leaf className="text-white" size={36} />
+          <div className="w-20 h-20 bg-gradient-to-br from-primary to-primary-soft rounded-3xl rotate-12 flex items-center justify-center shadow-lg">
+            <Leaf className="text-on-primary" size={36} />
           </div>
           <div className="space-y-1">
             <h4 className="font-black text-xl tracking-tight">Conoscermi</h4>
@@ -616,6 +616,24 @@ export function Settings({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingConfirm === 'clear'}
+        title="Cancellare tutti i dati?"
+        message="Diario e impostazioni verranno rimossi da questo dispositivo. Questa azione è irreversibile: esporta prima un backup se vuoi conservarli."
+        confirmLabel="Cancella tutto"
+        destructive
+        onCancel={() => setPendingConfirm(null)}
+        onConfirm={handleClearAll}
+      />
+      <ConfirmDialog
+        open={pendingConfirm === 'pin'}
+        title="Cambiare il PIN?"
+        message="Verrai disconnesso e dovrai impostare un nuovo PIN."
+        confirmLabel="Cambia PIN"
+        onCancel={() => setPendingConfirm(null)}
+        onConfirm={handleChangePin}
+      />
     </div>
   );
 }

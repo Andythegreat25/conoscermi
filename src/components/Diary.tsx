@@ -1,19 +1,22 @@
-import { Search, Plus, Filter, X, Edit2, Moon } from 'lucide-react';
+import { Search, Plus, Filter, X, Edit2, Moon, Trash2 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DiaryEntry, Mood } from '../types';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface DiaryProps {
   entries: DiaryEntry[];
   onAddEntry: () => void;
   onEditEntry: (entry: DiaryEntry) => void;
+  onDeleteEntry: (id: string) => void;
 }
 
 const MOODS: Mood[] = ['Forte', 'Meglio', 'Neutro', 'Arrabbiato', 'Difficile'];
 
-export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
+export function Diary({ entries, onAddEntry, onEditEntry, onDeleteEntry }: DiaryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMood, setSelectedMood] = useState<Mood | 'Tutti'>('Tutti');
+  const [entryToDelete, setEntryToDelete] = useState<DiaryEntry | null>(null);
 
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
@@ -44,6 +47,22 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
       default: return 'bg-secondary';
     }
   };
+
+  // Colore del testo abbinato allo sfondo di ogni umore, valido in tema chiaro e scuro
+  const getMoodTextColor = (mood: string) => {
+    switch (mood) {
+      case 'Forte': return 'text-on-primary';
+      case 'Meglio': return 'text-on-secondary';
+      case 'Neutro': return 'text-on-secondary-container';
+      case 'Arrabbiato': return 'text-on-error';
+      case 'Difficile': return 'text-surface';
+      default: return 'text-on-secondary';
+    }
+  };
+
+  const entryPreview = entryToDelete
+    ? (entryToDelete.note || entryToDelete.eveningNote || 'Nessuna nota aggiunta.')
+    : '';
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -81,7 +100,7 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
             onClick={() => setSelectedMood('Tutti')}
             className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
               selectedMood === 'Tutti'
-                ? 'bg-primary text-white shadow-md'
+                ? 'bg-primary text-on-primary shadow-md'
                 : 'bg-surface-container-highest text-on-surface-variant'
             }`}
           >
@@ -93,7 +112,7 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
               onClick={() => setSelectedMood(mood)}
               className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
                 selectedMood === mood
-                  ? `${getMoodColor(mood)} text-white shadow-md`
+                  ? `${getMoodColor(mood)} ${getMoodTextColor(mood)} shadow-md`
                   : 'bg-surface-container-highest text-on-surface-variant'
               }`}
             >
@@ -145,13 +164,24 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
                           <span className="text-xs font-bold uppercase tracking-widest text-secondary">{entry.mood}</span>
                           <span className="text-xs text-on-surface-variant/60 font-medium">{entry.time}</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center -mr-2 -mt-2">
                           <button
+                            type="button"
                             onClick={() => onEditEntry(entry)}
-                            className="p-1.5 text-outline-variant hover:text-primary hover:bg-surface-container-highest rounded-full transition-all"
+                            className="w-11 h-11 flex items-center justify-center text-outline hover:text-primary hover:bg-surface-container-highest rounded-full transition-[background-color,color] duration-200"
                             title="Modifica"
+                            aria-label="Modifica pensiero"
                           >
-                            <Edit2 size={16} />
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEntryToDelete(entry)}
+                            className="w-11 h-11 flex items-center justify-center text-outline hover:text-error hover:bg-error-container/40 rounded-full transition-[background-color,color] duration-200"
+                            title="Elimina"
+                            aria-label="Elimina pensiero"
+                          >
+                            <Trash2 size={18} />
                           </button>
                         </div>
                       </div>
@@ -181,14 +211,39 @@ export function Diary({ entries, onAddEntry, onEditEntry }: DiaryProps) {
       </div>
 
       {/* Floating Action Button (FAB) */}
-      <div className="fixed bottom-28 left-0 right-0 w-full max-w-[430px] mx-auto z-40 pointer-events-none flex justify-end px-6">
+      <div
+        className="fixed left-0 right-0 w-full max-w-[430px] mx-auto z-40 pointer-events-none flex justify-end px-6"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 6.5rem)' }}
+      >
         <button
           onClick={onAddEntry}
-          className="pointer-events-auto w-14 h-14 bg-gradient-to-br from-primary to-primary-container text-white rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform"
+          className="pointer-events-auto w-14 h-14 bg-gradient-to-br from-primary to-primary-soft text-on-primary rounded-full shadow-lg flex items-center justify-center active:scale-90 transition-transform"
         >
           <Plus size={32} />
         </button>
       </div>
+
+      <ConfirmDialog
+        open={entryToDelete !== null}
+        title="Eliminare questo pensiero?"
+        message="Il pensiero verrà rimosso dal diario. L'azione non si può annullare."
+        confirmLabel="Elimina"
+        destructive
+        onCancel={() => setEntryToDelete(null)}
+        onConfirm={() => {
+          if (entryToDelete) onDeleteEntry(entryToDelete.id);
+          setEntryToDelete(null);
+        }}
+      >
+        {entryToDelete && (
+          <div className="rounded-2xl bg-surface-container p-4">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-outline">
+              {entryToDelete.date} · {entryToDelete.time}
+            </p>
+            <p className="mt-1 text-sm text-on-surface line-clamp-3">{entryPreview}</p>
+          </div>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }

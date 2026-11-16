@@ -152,7 +152,7 @@ export function CheckIn({ onSave }: CheckInProps) {
         <button
           onClick={handleSave}
           disabled={!selectedMood}
-          className="w-full h-14 rounded-full bg-gradient-to-br from-primary to-primary-container text-white font-bold text-lg shadow-[0_12px_32px_rgba(140,78,55,0.25)] hover:opacity-90 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:active:scale-100"
+          className="w-full h-14 rounded-full bg-gradient-to-br from-primary to-primary-soft text-on-primary font-bold text-lg shadow-[0_12px_32px_rgba(140,78,55,0.25)] hover:opacity-90 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:active:scale-100"
         >
           Salva check-in
         </button>
