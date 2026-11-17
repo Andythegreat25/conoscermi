@@ -1,15 +1,12 @@
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { MessageCircle, Upload, Send, User, MessageCircleHeart, Trash2, ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { EchoMessage, Persona } from '../types';
-import { GoogleGenAI } from "@google/genai";
 import { toast } from 'sonner';
 import { ConfirmDialog } from './ConfirmDialog';
+import { askEcho } from '../utils/echo';
+import { ApiError } from '../utils/api';
 
-interface EchoesProps {
-  apiKey: string;
-}
-
-export function Echoes({ apiKey }: EchoesProps) {
+export function Echoes() {
   const [persona, setPersona] = useState<Persona | null>(null);
   const [messages, setMessages] = useState<EchoMessage[]>([]);
   const [input, setInput] = useState('');
@@ -115,23 +112,6 @@ export function Echoes({ apiKey }: EchoesProps) {
   const handleSendMessage = async () => {
     if (!input.trim() || !persona) return;
 
-    // Use prop if provided, otherwise try global process.env
-    let envKey = '';
-    try {
-      envKey = process.env.GEMINI_API_KEY || '';
-    } catch (e) {
-      // Silent fail for env access
-    }
-    
-    const effectiveApiKey = apiKey || envKey;
-
-    if (!effectiveApiKey) {
-      toast.error("Configurazione mancante", {
-        description: "L'API Key di Gemini non è stata trovata. Assicurati che sia configurata correttamente nell'ambiente."
-      });
-      return;
-    }
-
     const generateId = () => {
       try {
         return crypto.randomUUID();
@@ -154,47 +134,29 @@ export function Echoes({ apiKey }: EchoesProps) {
     const toastId = toast.loading("L'eco sta scrivendo...");
 
     try {
-      const ai = new GoogleGenAI({ apiKey: effectiveApiKey });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            role: 'user',
-            parts: [{
-              text: `Sei un'intelligenza artificiale che deve imitare lo stile di scrittura di una persona chiamata ${persona.name}. 
-              Ecco alcuni esempi dei suoi messaggi reali per capire il suo stile (emoji, lunghezza, tono, parole tipiche):
-              ---
-              ${persona.context}
-              ---
-              Regole:
-              1. Rispondi in modo breve e naturale, come in una chat WhatsApp.
-              2. Usa lo stesso tono (formale, informale, dolce, distaccato) degli esempi.
-              3. Usa le emoji se la persona le usava.
-              4. Non dire mai che sei un'IA. Sii ${persona.name}.
-              
-              Messaggio dell'utente: ${input}`
-            }]
-          }
-        ],
-        config: {
-          temperature: 0.8,
-          topP: 0.95,
-        }
+      // La risposta la chiede il Worker a Gemini: la chiave non sta mai nell'app
+      const reply = await askEcho({
+        name: persona.name,
+        context: persona.context,
+        message: userMsg.content,
       });
 
       const personaMsg: EchoMessage = {
         id: generateId(),
         role: 'persona',
-        content: response.text || "...",
+        content: reply,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, personaMsg]);
       toast.dismiss(toastId);
     } catch (error) {
-      console.error("Gemini Error:", error);
-      toast.error("Errore di comunicazione", {
+      console.error("Errore dell'eco:", error);
+      const limitReached = error instanceof ApiError && error.status === 429;
+      toast.error(limitReached ? "Limite di oggi raggiunto" : "Errore di comunicazione", {
         id: toastId,
-        description: "Non è stato possibile ricevere una risposta dall'eco digitale. Riprova tra poco."
+        description: error instanceof ApiError && error.message
+          ? error.message
+          : "Non è stato possibile ricevere una risposta dall'eco digitale. Riprova tra poco."
       });
     } finally {
       setIsTyping(false);

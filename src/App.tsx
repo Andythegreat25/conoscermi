@@ -643,7 +643,7 @@ export default function App() {
           />
         } />
         <Route path="/journey" element={<Journey entries={entries} />} />
-        <Route path="/echoes" element={<Echoes apiKey={import.meta.env.VITE_GEMINI_API_KEY || ''} />} />
+        <Route path="/echoes" element={<Echoes />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

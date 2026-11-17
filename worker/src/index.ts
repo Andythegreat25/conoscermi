@@ -13,6 +13,9 @@ interface Env {
   VAPID_PUBLIC_KEY: string;
   VAPID_PRIVATE_KEY: string;
   VAPID_SUBJECT: string;
+  /** Segreto Cloudflare (wrangler secret put GEMINI_API_KEY). Non va mai nel codice dell'app. */
+  GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
 }
 
 interface StoredSubscription {
@@ -270,6 +273,115 @@ async function dispatchReminders(timestamp: number, env: Env): Promise<void> {
   }
 }
 
+// ── Echi del Cuore ────────────────────────────────────────────────────────
+// Il browser non riceve mai la chiave di Gemini: manda qui il messaggio e il Worker
+// chiama Gemini. Il prompt lo costruisce il Worker, così l'endpoint non si può usare
+// come accesso libero a Gemini, e ogni utente ha un limite giornaliero.
+
+const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
+const ECHO_DAILY_LIMIT = 100;
+const ECHO_MAX_NAME = 80;
+const ECHO_MAX_MESSAGE = 2000;
+const ECHO_MAX_CONTEXT = 12000;
+
+let echoTableReady = false;
+
+async function ensureEchoTable(env: Env): Promise<void> {
+  if (echoTableReady) return;
+  await env.DB.prepare(
+    'CREATE TABLE IF NOT EXISTS echo_usage (uid TEXT NOT NULL, day TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (uid, day))',
+  ).run();
+  echoTableReady = true;
+}
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Conta una richiesta. Restituisce false se l'utente ha già esaurito il limite di oggi. */
+async function consumeEchoQuota(env: Env, uid: string): Promise<boolean> {
+  await ensureEchoTable(env);
+  const result = await env.DB.prepare(
+    `INSERT INTO echo_usage (uid, day, count) VALUES (?, ?, 1)
+     ON CONFLICT(uid, day) DO UPDATE SET count = count + 1 WHERE count < ?`,
+  ).bind(uid, today(), ECHO_DAILY_LIMIT).run();
+  return (result.meta.changes ?? 0) === 1;
+}
+
+async function refundEchoQuota(env: Env, uid: string): Promise<void> {
+  await env.DB.prepare('UPDATE echo_usage SET count = MAX(count - 1, 0) WHERE uid = ? AND day = ?')
+    .bind(uid, today()).run();
+}
+
+function readEchoText(value: unknown, max: number, truncateFromStart = false): string {
+  if (typeof value !== 'string') throw new Error('INVALID_ECHO');
+  const text = value.trim();
+  if (!text) throw new Error('INVALID_ECHO');
+  if (text.length <= max) return text;
+  if (truncateFromStart) return text.slice(-max); // del contesto restano i messaggi più recenti
+  throw new Error('INVALID_ECHO');
+}
+
+async function askGemini(env: Env, name: string, context: string, message: string): Promise<string> {
+  const prompt = `Sei un'intelligenza artificiale che deve imitare lo stile di scrittura di una persona chiamata ${name}.
+Ecco alcuni esempi dei suoi messaggi reali per capire il suo stile (emoji, lunghezza, tono, parole tipiche):
+---
+${context}
+---
+Regole:
+1. Rispondi in modo breve e naturale, come in una chat WhatsApp.
+2. Usa lo stesso tono (formale, informale, dolce, distaccato) degli esempi.
+3. Usa le emoji se la persona le usava.
+4. Non dire mai che sei un'IA. Sii ${name}.
+
+Messaggio dell'utente: ${message}`;
+
+  const model = env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const upstream = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY as string },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.8, topP: 0.95, maxOutputTokens: 512 },
+      }),
+    },
+  );
+
+  if (!upstream.ok) {
+    // Si registra solo l'esito, mai il testo dell'utente
+    console.error('Gemini ha risposto con errore', upstream.status, (await upstream.text()).slice(0, 200));
+    throw new Error('UPSTREAM');
+  }
+
+  const data = await upstream.json() as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = data.candidates?.[0]?.content?.parts?.map(part => part.text ?? '').join('').trim();
+  return text || '...';
+}
+
+async function echo(request: Request, env: Env, origin: string): Promise<Response> {
+  const uid = await authenticate(request, env);
+  const data = await readJson(request);
+  const name = readEchoText(data.name, ECHO_MAX_NAME);
+  const context = readEchoText(data.context, ECHO_MAX_CONTEXT, true);
+  const message = readEchoText(data.message, ECHO_MAX_MESSAGE);
+
+  if (!env.GEMINI_API_KEY) throw new Error('NOT_CONFIGURED');
+  if (!await consumeEchoQuota(env, uid)) {
+    return response({ error: 'Hai raggiunto il limite di messaggi di oggi. Riprova domani.' }, 429, origin);
+  }
+
+  try {
+    return response({ text: await askGemini(env, name, context, message) }, 200, origin);
+  } catch (error) {
+    await refundEchoQuota(env, uid); // un errore del servizio non deve consumare il limite
+    throw error;
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -285,11 +397,18 @@ export default {
     try {
       if (url.pathname === '/preferences' && request.method === 'POST') return await savePreferences(request, env, origin);
       if (url.pathname === '/activity' && request.method === 'POST') return await recordActivity(request, env, origin);
+      if (url.pathname === '/echo' && request.method === 'POST') return await echo(request, env, origin);
       return response({ error: 'Endpoint non trovato.' }, 404, origin);
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
       if (code === 'UNAUTHENTICATED') {
         return response({ error: 'Autenticazione non valida.' }, 401, origin);
+      }
+      if (code === 'NOT_CONFIGURED') {
+        return response({ error: 'Il servizio delle risposte non è ancora configurato.' }, 503, origin);
+      }
+      if (code === 'UPSTREAM') {
+        return response({ error: 'Il servizio delle risposte non è disponibile in questo momento.' }, 502, origin);
       }
       if (code.startsWith('INVALID_') || error instanceof RangeError) return response({ error: 'Dati non validi.' }, 400, origin);
       console.error('Push API error', error);
@@ -299,5 +418,15 @@ export default {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(dispatchReminders(controller.scheduledTime, env));
+    // Ogni ora toglie i conteggi dei giorni passati (ne bastano pochi giorni)
+    ctx.waitUntil((async () => {
+      try {
+        await ensureEchoTable(env);
+        const cutoff = new Date(controller.scheduledTime - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        await env.DB.prepare('DELETE FROM echo_usage WHERE day < ?').bind(cutoff).run();
+      } catch (error) {
+        console.error('Pulizia echo_usage non riuscita', error);
+      }
+    })());
   },
 } satisfies ExportedHandler<Env>;

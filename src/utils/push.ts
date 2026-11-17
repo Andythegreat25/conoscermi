@@ -1,5 +1,4 @@
-import { signInAnonymously } from 'firebase/auth';
-import { auth } from '../firebase';
+import { apiUrl, ensureAuthenticated, authenticatedPost } from './api';
 
 const CLIENT_ID_KEY = 'push_client_id';
 
@@ -11,12 +10,6 @@ export interface PushPreferences {
 }
 
 type PushConfigResponse = { publicKey: string };
-
-function apiUrl(path: string): string {
-  const baseUrl = import.meta.env.VITE_PUSH_API_URL?.replace(/\/$/, '');
-  if (!baseUrl) throw new Error('Servizio notifiche non configurato.');
-  return `${baseUrl}${path}`;
-}
 
 function getClientId(): string {
   const existing = localStorage.getItem(CLIENT_ID_KEY);
@@ -35,28 +28,6 @@ function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
 
   for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
   return bytes;
-}
-
-async function ensureAuthenticated(): Promise<void> {
-  if (!auth.currentUser) await signInAnonymously(auth);
-}
-
-async function authenticatedRequest(path: string, body: unknown): Promise<void> {
-  await ensureAuthenticated();
-  const token = await auth.currentUser!.getIdToken();
-  const response = await fetch(apiUrl(path), {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Il servizio notifiche non è raggiungibile.');
-  }
 }
 
 function assertPushSupport(): void {
@@ -98,7 +69,7 @@ export async function syncPushPreferences(preferences: PushPreferences): Promise
   // Nothing has ever been subscribed on this device, so there is no server state to disable.
   if (!subscription) return;
 
-  await authenticatedRequest('/preferences', {
+  await authenticatedPost('/preferences', {
     clientId: getClientId(),
     subscription: subscription.toJSON(),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome',
@@ -117,7 +88,7 @@ export async function recordReminderActivity(
   if (!subscription) return;
 
   await ensureAuthenticated();
-  await authenticatedRequest('/activity', { clientId: getClientId(), type, date });
+  await authenticatedPost('/activity', { clientId: getClientId(), type, date });
 }
 
 export function localDateKey(date = new Date()): string {
