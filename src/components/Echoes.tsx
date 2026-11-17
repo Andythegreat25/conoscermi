@@ -191,7 +191,7 @@ export function Echoes() {
           <div className="space-y-2">
             <h3 className="text-xl font-bold text-on-surface">Importa Chat WhatsApp</h3>
             <p className="text-sm text-on-surface-variant max-w-xs mx-auto">
-              Esporta la chat da WhatsApp come file .txt (senza media) e caricalo qui. I dati rimarranno privati sul tuo dispositivo.
+              Esporta la chat da WhatsApp come file .txt (senza media) e caricalo qui. La chat resta su questo dispositivo. Per rispondere, il nome, alcuni messaggi di esempio e quello che scrivi nella chat vengono inviati a Google (Gemini) tramite il servizio dell'app. Il tuo diario non viene mai inviato.
             </p>
           </div>
           <button 

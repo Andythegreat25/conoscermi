@@ -91,6 +91,17 @@ export async function recordReminderActivity(
   await authenticatedPost('/activity', { clientId: getClientId(), type, date });
 }
 
+/** Elimina dal server l'abbonamento di questo dispositivo. Non fa niente se non ce n'è uno. */
+export async function removePushSubscriptionFromServer(): Promise<void> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+  const registration = await navigator.serviceWorker.getRegistration();
+  const subscription = await registration?.pushManager.getSubscription();
+  if (!subscription) return;
+
+  await authenticatedPost('/unsubscribe', { clientId: getClientId() });
+}
+
 export function localDateKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }

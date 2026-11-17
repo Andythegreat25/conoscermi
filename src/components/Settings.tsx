@@ -5,6 +5,8 @@ import { DiaryEntry } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DefaultAvatar } from './DefaultAvatar';
 import { CURRENT_BUILD, formatBuildTime } from '../utils/updates';
+import { wipeAllData } from '../utils/wipe';
+import { removePin, AUTO_LOCK_OPTIONS, getAutoLockMinutes, setAutoLockMinutes } from '../utils/pin';
 
 interface StorageBreakdown {
   total: string;
@@ -60,6 +62,7 @@ export function Settings({
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<'clear' | 'pin' | null>(null);
+  const [autoLock, setAutoLock] = useState<number>(() => getAutoLockMinutes());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -264,15 +267,22 @@ export function Settings({
     reader.readAsText(file);
   };
 
-  const handleClearAll = () => {
-    localStorage.removeItem('diary_entries');
-    localStorage.removeItem('app_settings');
+  const handleClearAll = async () => {
+    setPendingConfirm(null);
+    toast.loading('Cancellazione in corso…', { id: 'wipe' });
+    // Diario, impostazioni, PIN, Echi, preferiti, notifiche (anche sul server) e accesso anonimo
+    await wipeAllData();
     window.location.reload();
   };
 
   const handleChangePin = () => {
-    localStorage.removeItem('user_pin');
+    removePin();
     window.location.reload();
+  };
+
+  const handleAutoLockChange = (minutes: number) => {
+    setAutoLock(minutes);
+    setAutoLockMinutes(minutes);
   };
 
   const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -380,6 +390,22 @@ export function Settings({
             <span className="font-medium">Cambia PIN di accesso</span>
             <ArrowLeft size={20} className="rotate-180 text-outline-variant" />
           </button>
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-surface-container-lowest">
+            <div className="min-w-0">
+              <p className="font-medium text-on-surface">Blocco automatico</p>
+              <p className="text-sm text-on-surface-variant">Chiede il PIN quando torni nell'app</p>
+            </div>
+            <select
+              value={autoLock}
+              onChange={e => handleAutoLockChange(Number(e.target.value))}
+              aria-label="Blocco automatico"
+              className="bg-surface-container-highest text-on-surface font-bold text-base px-3 py-2 rounded-xl border-0 focus:ring-2 focus:ring-primary outline-none shrink-0"
+            >
+              {AUTO_LOCK_OPTIONS.map(option => (
+                <option key={option.minutes} value={option.minutes}>{option.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Notifications */}
@@ -524,8 +550,12 @@ export function Settings({
                 <Database size={24} />
                 <h3 className="font-bold text-xl">Privacy & Dati Locali</h3>
               </div>
-              <p className="text-on-surface-variant text-sm">
-                Non usiamo cloud. Tutto è salvato qui sul tuo dispositivo.
+              <p className="text-on-surface-variant text-sm leading-relaxed">
+                Diario, umore e note restano su questo dispositivo e non vengono mai inviati a nessuno.
+                Due funzioni usano un servizio esterno, ma solo se le attivi. I promemoria salvano su
+                un nostro servizio il collegamento per le notifiche, l'orario scelto e il fuso orario.
+                Gli Echi del Cuore inviano a Google (Gemini) il nome, alcuni messaggi di esempio della
+                chat importata e quello che scrivi nella chat.
               </p>
             </div>
 
@@ -599,7 +629,7 @@ export function Settings({
             </button>
           </div>
           <p className="text-center text-xs text-on-surface-variant/60 font-medium">
-            La cancellazione dei dati è permanente e non può essere annullata.
+            "Cancella tutto" elimina diario, impostazioni, PIN, chat degli Echi, preferiti e notifiche, anche dal servizio online. È permanente e non può essere annullata.
           </p>
         </div>
 
@@ -625,7 +655,7 @@ export function Settings({
       <ConfirmDialog
         open={pendingConfirm === 'clear'}
         title="Cancellare tutti i dati?"
-        message="Diario e impostazioni verranno rimossi da questo dispositivo. Questa azione è irreversibile: esporta prima un backup se vuoi conservarli."
+        message="Diario, impostazioni, PIN, chat degli Echi e notifiche verranno eliminati, anche dal servizio online. Questa azione è irreversibile: esporta prima un backup se vuoi conservare il diario."
         confirmLabel="Cancella tutto"
         destructive
         onCancel={() => setPendingConfirm(null)}

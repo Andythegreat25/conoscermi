@@ -22,6 +22,7 @@ import { saveReminderSettings, saveEveningReminderSettings } from './utils/db';
 import { hasCheckedInToday } from './utils/streak';
 import { parseBackup, mergeEntries } from './utils/backup';
 import { Breathing } from './components/Breathing';
+import { hasPin as readHasPin, getAutoLockMinutes } from './utils/pin';
 import {
   CURRENT_BUILD,
   UPDATES_ENABLED,
@@ -65,6 +66,9 @@ export default function App() {
   }, [offlineReady, setOfflineReady]);
 
   const [isUnlocked, setIsUnlocked] = useState(false);
+  // Vero dopo il primo sblocco della sessione. Dopo un blocco automatico la schermata del PIN
+  // si sovrappone all'app senza smontarla, così una bozza a metà non va persa.
+  const [sessionStarted, setSessionStarted] = useState(false);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [showSplash, setShowSplash] = useState(true);
 
@@ -110,8 +114,8 @@ export default function App() {
 
   // Check for existing PIN and load initial data
   useEffect(() => {
-    const savedPin = localStorage.getItem('user_pin');
-    setHasPin(!!savedPin);
+    const pinExists = readHasPin();
+    setHasPin(pinExists);
 
     // Dopo un ricaricamento per aggiornamento (solo in questa scheda) resta sbloccata.
     // Il flag vale 10 secondi e si elimina subito: oltre, serve di nuovo il PIN.
@@ -119,8 +123,9 @@ export default function App() {
       const stamp = Number(sessionStorage.getItem('resume_unlocked'));
       sessionStorage.removeItem('resume_unlocked');
       const age = Date.now() - stamp;
-      if (savedPin && Number.isFinite(stamp) && stamp > 0 && age >= 0 && age < 10_000) {
+      if (pinExists && Number.isFinite(stamp) && stamp > 0 && age >= 0 && age < 10_000) {
         setIsUnlocked(true);
+        setSessionStarted(true);
       }
     } catch { /* noop */ }
 
@@ -179,6 +184,27 @@ export default function App() {
   useEffect(() => {
     isUnlockedRef.current = isUnlocked;
   }, [isUnlocked]);
+
+  // ── Blocco automatico ───────────────────────────────────────────────────
+  // Se esci dall'app per più del tempo scelto nelle Impostazioni, al ritorno serve il PIN.
+  const hiddenAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+      const hiddenAt = hiddenAtRef.current;
+      hiddenAtRef.current = null;
+      if (hiddenAt === null || !isUnlockedRef.current) return;
+
+      const minutes = getAutoLockMinutes();
+      if (minutes < 0) return; // "Mai"
+      if (Date.now() - hiddenAt >= minutes * 60_000) setIsUnlocked(false);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   const reloadForUpdate = () => {
     // Il flag di ripresa si salva solo se l'app è davvero sbloccata in questo momento,
@@ -551,12 +577,14 @@ export default function App() {
     return <SplashScreen />;
   }
 
-  if (!isUnlocked) {
+  // Primo accesso della sessione: finché non si inserisce il PIN l'app non viene nemmeno disegnata
+  if (!isUnlocked && !sessionStarted) {
     return (
       <PinLock
         isSetup={!hasPin}
         onUnlock={() => {
           setIsUnlocked(true);
+          setSessionStarted(true);
           setHasPin(true);
         }}
       />
@@ -700,6 +728,9 @@ export default function App() {
           />
         )}
       </div>
+
+      {/* Blocco automatico o pulsante "Blocca": il PIN copre l'app, che resta com'era */}
+      {!isUnlocked && <PinLock onUnlock={() => setIsUnlocked(true)} />}
     </div>
   );
 }

@@ -184,6 +184,19 @@ async function recordActivity(request: Request, env: Env, origin: string): Promi
   return response({ ok: true }, 200, origin);
 }
 
+/** Elimina dal server l'abbonamento di questo dispositivo (usato da "Cancella tutto" nell'app). */
+async function removeSubscription(request: Request, env: Env, origin: string): Promise<Response> {
+  const uid = await authenticate(request, env);
+  const data = await readJson(request);
+  const clientId = readClientId(data.clientId);
+
+  await env.DB.prepare('DELETE FROM push_subscriptions WHERE id = ? AND uid = ?')
+    .bind(`${uid}:${clientId}`, uid)
+    .run();
+
+  return response({ ok: true }, 200, origin);
+}
+
 function localClock(timestamp: number, timezone: string): LocalClock {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
@@ -431,6 +444,7 @@ export default {
     try {
       if (url.pathname === '/preferences' && request.method === 'POST') return await savePreferences(request, env, origin);
       if (url.pathname === '/activity' && request.method === 'POST') return await recordActivity(request, env, origin);
+      if (url.pathname === '/unsubscribe' && request.method === 'POST') return await removeSubscription(request, env, origin);
       if (url.pathname === '/echo' && request.method === 'POST') return await echo(request, env, origin);
       return response({ error: 'Endpoint non trovato.' }, 404, origin);
     } catch (error) {
