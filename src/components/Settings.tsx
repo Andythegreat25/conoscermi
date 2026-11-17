@@ -7,7 +7,14 @@ import { PinLock } from './PinLock';
 import { DefaultAvatar } from './DefaultAvatar';
 import { CURRENT_BUILD, formatBuildTime } from '../utils/updates';
 import { wipeAllData } from '../utils/wipe';
-import { removePin, AUTO_LOCK_OPTIONS, getAutoLockMinutes, setAutoLockMinutes } from '../utils/pin';
+import { removePin, hasPin, AUTO_LOCK_OPTIONS, getAutoLockMinutes, setAutoLockMinutes } from '../utils/pin';
+
+/** Un'azione delicata che parte solo dopo aver inserito il PIN attuale. */
+interface PinGate {
+  title: string;
+  subtitle: string;
+  run: () => void;
+}
 
 interface StorageBreakdown {
   total: string;
@@ -63,7 +70,7 @@ export function Settings({
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<'clear' | null>(null);
-  const [verifyingPin, setVerifyingPin] = useState(false);
+  const [pinGate, setPinGate] = useState<PinGate | null>(null);
   const [autoLock, setAutoLock] = useState<number>(() => getAutoLockMinutes());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -282,6 +289,18 @@ export function Settings({
     window.location.reload();
   };
 
+  /**
+   * Chiede il PIN attuale prima di un'azione che porta fuori i dati o li cancella.
+   * Così chi ha in mano il telefono già sbloccato non può esportare o cancellare il diario.
+   */
+  const requirePin = (title: string, subtitle: string, run: () => void) => {
+    if (!hasPin()) {
+      run(); // nessun PIN impostato: non c'è niente da verificare
+      return;
+    }
+    setPinGate({ title, subtitle, run });
+  };
+
   const handleAutoLockChange = (minutes: number) => {
     setAutoLock(minutes);
     setAutoLockMinutes(minutes);
@@ -386,7 +405,11 @@ export function Settings({
             <h3 className="font-bold text-lg">Sicurezza</h3>
           </div>
           <button
-            onClick={() => setVerifyingPin(true)}
+            onClick={() => requirePin(
+              'Cambia PIN',
+              'Inserisci il PIN attuale per continuare. Poi ne sceglierai uno nuovo.',
+              handleChangePin,
+            )}
             className="w-full flex items-center justify-between p-4 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container-highest transition-colors"
           >
             <span className="font-medium">Cambia PIN di accesso</span>
@@ -588,7 +611,11 @@ export function Settings({
 
           <div className="grid grid-cols-1 gap-4">
             <button
-              onClick={handleExportPDF}
+              onClick={() => requirePin(
+                'Esporta il diario',
+                'Inserisci il PIN per creare il PDF. Il file conterrà tutti i tuoi pensieri.',
+                handleExportPDF,
+              )}
               disabled={isExportingPDF}
               className="flex items-center justify-center gap-3 bg-primary text-on-primary font-bold py-4 px-6 rounded-full hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
             >
@@ -600,7 +627,11 @@ export function Settings({
               Esporta Diario (PDF)
             </button>
             <button
-              onClick={handleExport}
+              onClick={() => requirePin(
+                'Esporta i dati',
+                'Inserisci il PIN per creare il backup. Il file conterrà tutti i tuoi pensieri, non protetti.',
+                handleExport,
+              )}
               className="flex items-center justify-center gap-3 bg-surface-container-highest text-primary font-bold py-4 px-6 rounded-full hover:bg-outline-variant/20 transition-all active:scale-95"
             >
               <Download size={20} />
@@ -655,20 +686,31 @@ export function Settings({
       <ConfirmDialog
         open={pendingConfirm === 'clear'}
         title="Cancellare tutti i dati?"
-        message="Diario, impostazioni, PIN, chat degli Echi e notifiche verranno eliminati, anche dal servizio online. Questa azione è irreversibile: esporta prima un backup se vuoi conservare il diario."
-        confirmLabel="Cancella tutto"
+        message="Diario, impostazioni, PIN, chat degli Echi e notifiche verranno eliminati, anche dal servizio online. Questa azione è irreversibile: esporta prima un backup se vuoi conservare il diario. Per confermare ti chiederemo il PIN."
+        confirmLabel="Continua"
         destructive
         onCancel={() => setPendingConfirm(null)}
-        onConfirm={handleClearAll}
+        onConfirm={() => {
+          setPendingConfirm(null);
+          requirePin(
+            'Cancella tutto',
+            'Inserisci il PIN per confermare. Dopo, non si può tornare indietro.',
+            handleClearAll,
+          );
+        }}
       />
 
-      {/* Per cambiare il PIN serve prima quello attuale: la schermata verifica e poi prosegue */}
-      {verifyingPin && (
+      {/* Azioni delicate (cambio PIN, esportazioni, cancellazione): partono solo con il PIN attuale */}
+      {pinGate && (
         <PinLock
-          title="Cambia PIN"
-          subtitle="Inserisci il PIN attuale per continuare. Poi ne sceglierai uno nuovo."
-          onCancel={() => setVerifyingPin(false)}
-          onUnlock={handleChangePin}
+          title={pinGate.title}
+          subtitle={pinGate.subtitle}
+          onCancel={() => setPinGate(null)}
+          onUnlock={() => {
+            const { run } = pinGate;
+            setPinGate(null);
+            run();
+          }}
         />
       )}
     </div>
