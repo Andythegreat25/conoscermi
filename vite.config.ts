@@ -68,6 +68,22 @@ export default defineConfig(() => {
             { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
             { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
             { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }
+          ],
+          // Scorciatoie dall'icona (pressione lunga). Funzionano su Android e computer:
+          // iPhone e iPad non le supportano ancora.
+          shortcuts: [
+            {
+              name: 'Nuovo pensiero',
+              short_name: 'Pensiero',
+              url: '/#/diary?new=1',
+              icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }],
+            },
+            {
+              name: 'Check-in',
+              short_name: 'Check-in',
+              url: '/#/checkin',
+              icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }],
+            },
           ]
         }
       })

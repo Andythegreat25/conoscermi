@@ -1,10 +1,25 @@
-import { PenSquare, Heart, Flame, Leaf, Award, Sprout, Trophy, Gem } from 'lucide-react';
+import { useMemo } from 'react';
+import { PenSquare, Heart, Flame, Leaf, Award, Sprout, Trophy, Gem, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { DiaryEntry, Mood } from '../types';
 import { calculateStreak, calculateMaxStreak } from '../utils/streak';
+import { weeklySummary, moodCalendar } from '../utils/insights';
 
 interface JourneyProps {
   entries: DiaryEntry[];
+  /** Apre il Diario sulla voce scelta (dal calendario dell'umore). */
+  onOpenDiaryEntry: (entryId: string) => void;
 }
+
+// Colore di ogni umore nel calendario: gli stessi dei filtri del Diario
+const MOOD_CELL: Record<Mood, string> = {
+  Forte: 'bg-primary',
+  Meglio: 'bg-secondary',
+  Neutro: 'bg-secondary-container',
+  Arrabbiato: 'bg-error',
+  Difficile: 'bg-outline',
+};
+const LEGEND: Mood[] = ['Difficile', 'Arrabbiato', 'Neutro', 'Meglio', 'Forte'];
+const WEEKDAYS = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
 
 const MILESTONES = [
   { days: 7,   label: '7 Giorni',   Icon: Award,    gradient: 'from-secondary to-tertiary',               textColor: 'text-white' },
@@ -14,7 +29,7 @@ const MILESTONES = [
   { days: 365, label: '1 Anno',     Icon: Trophy,   gradient: 'from-primary to-tertiary',                  textColor: 'text-white' },
 ];
 
-export function Journey({ entries }: JourneyProps) {
+export function Journey({ entries, onOpenDiaryEntry }: JourneyProps) {
   // Calculate total days since first entry
   const calculateTotalDays = () => {
     if (!entries || entries.length === 0) return 0;
@@ -77,6 +92,9 @@ export function Journey({ entries }: JourneyProps) {
   };
 
   const trendData = getTrendData();
+
+  const summary = useMemo(() => weeklySummary(entries), [entries]);
+  const calendar = useMemo(() => moodCalendar(entries), [entries]);
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
@@ -151,6 +169,88 @@ export function Journey({ entries }: JourneyProps) {
               style={{ height: `${Math.max(item.score, 5)}%`, opacity: item.isToday ? 1 : (item.score > 0 ? (item.score / 100) * 0.8 + 0.2 : 0.3) }}
             ></div>
           ))}
+        </div>
+      </section>
+
+      {/* Riepilogo della settimana */}
+      <section className="space-y-4">
+        <h3 className="text-sm font-bold uppercase tracking-[0.15em] text-on-surface-variant px-1">Questa settimana</h3>
+        {summary.daysWithEntry > 0 ? (
+          <div className="bg-surface-container-low p-6 rounded-lg space-y-5">
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <div className="text-2xl font-extrabold text-primary tabular-nums">
+                  {summary.daysWithEntry}
+                  <span className="text-sm font-bold text-on-surface-variant">/7</span>
+                </div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Giorni con un pensiero</div>
+              </div>
+              <div>
+                <div className="text-lg font-extrabold text-on-surface leading-tight py-0.5">{summary.mostFrequentMood}</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Umore più frequente</div>
+              </div>
+              <div>
+                <div className="text-lg font-extrabold text-on-surface capitalize leading-tight py-0.5">{summary.bestDay}</div>
+                <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Giorno migliore</div>
+              </div>
+            </div>
+            {summary.trend && (
+              <div className="flex items-center gap-2 border-t border-outline-variant/20 pt-4 text-sm text-on-surface-variant">
+                {summary.trend === 'up' && <TrendingUp size={18} className="text-secondary shrink-0" />}
+                {summary.trend === 'down' && <TrendingDown size={18} className="text-outline shrink-0" />}
+                {summary.trend === 'same' && <Minus size={18} className="text-outline shrink-0" />}
+                <span>
+                  {summary.trend === 'up' && 'Rispetto alla settimana scorsa il tuo umore è più alto.'}
+                  {summary.trend === 'down' && 'Rispetto alla settimana scorsa il tuo umore è più basso. Succede, e scriverne aiuta.'}
+                  {summary.trend === 'same' && 'Rispetto alla settimana scorsa il tuo umore è stabile.'}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="bg-surface-container-low p-6 rounded-lg text-sm text-on-surface-variant leading-relaxed">
+            Scrivi un pensiero o fai un check-in per vedere qui il riepilogo della settimana.
+          </p>
+        )}
+      </section>
+
+      {/* Calendario dell'umore */}
+      <section className="space-y-4">
+        <h3 className="text-sm font-bold uppercase tracking-[0.15em] text-on-surface-variant px-1">Calendario dell'umore</h3>
+        <div className="bg-surface-container-low p-5 rounded-lg space-y-3">
+          <div className="grid grid-cols-7 gap-1.5 text-center" aria-hidden="true">
+            {WEEKDAYS.map((d, i) => (
+              <span key={i} className="text-[10px] font-bold text-outline">{d}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {calendar.map((day) => {
+              if (day.isFuture) return <div key={day.key} className="aspect-square invisible" />;
+              const color = day.mood ? MOOD_CELL[day.mood] : 'bg-surface-container-highest/50';
+              const ring = day.isToday ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface-container-low' : '';
+              const label = `${day.date.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}: ${day.mood ?? 'nessun pensiero'}`;
+              return day.entryId ? (
+                <button
+                  key={day.key}
+                  type="button"
+                  onClick={() => onOpenDiaryEntry(day.entryId as string)}
+                  aria-label={label}
+                  title={label}
+                  className={`aspect-square rounded-lg ${color} ${ring} active:scale-90 transition-transform duration-200`}
+                />
+              ) : (
+                <div key={day.key} role="img" aria-label={label} title={label} className={`aspect-square rounded-lg ${color} ${ring}`} />
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between pt-2" aria-hidden="true">
+            {LEGEND.map((mood) => (
+              <span key={mood} className="flex items-center gap-1.5 text-[10px] font-semibold text-on-surface-variant">
+                <span className={`inline-block w-2.5 h-2.5 rounded-full ${MOOD_CELL[mood]}`} />
+                {mood}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 

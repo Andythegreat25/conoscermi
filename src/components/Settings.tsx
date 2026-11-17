@@ -1,7 +1,7 @@
 import { Palette, Cloud, Database, Download, Upload, Trash2, Leaf, ArrowLeft, Bell, Smartphone, Lock, Key, RefreshCw, Camera, FileText, Moon } from 'lucide-react';
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { toast } from 'sonner';
-import { DiaryEntry } from '../types';
+import { DiaryEntry, ThemePreference } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { PinLock } from './PinLock';
 import { DefaultAvatar } from './DefaultAvatar';
@@ -30,8 +30,8 @@ interface SettingsProps {
   onLogout: () => void;
   onCheckUpdates: () => void;
   isCheckingUpdates?: boolean;
-  theme: 'light' | 'dark';
-  onThemeChange: (theme: 'light' | 'dark') => void;
+  theme: ThemePreference;
+  onThemeChange: (theme: ThemePreference) => void;
   avatarUrl: string | null;
   onAvatarChange: (url: string | null) => void;
   entries: DiaryEntry[];
@@ -490,32 +490,30 @@ export function Settings({
             <h3 className="font-bold text-lg">Aspetto</h3>
           </div>
           <div className="space-y-3">
-            <button
-              onClick={() => onThemeChange('light')}
-              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
-                theme === 'light'
-                  ? 'bg-surface-container-lowest text-on-surface border-2 border-primary shadow-sm'
-                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest/50'
-              }`}
-            >
-              <span className="font-medium">Tema Chiaro</span>
-              <div className={`w-5 h-5 rounded-full border-2 ${theme === 'light' ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
-                {theme === 'light' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-on-primary rounded-full"></div></div>}
-              </div>
-            </button>
-            <button
-              onClick={() => onThemeChange('dark')}
-              className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${
-                theme === 'dark'
-                  ? 'bg-surface-container-lowest text-on-surface border-2 border-primary shadow-sm'
-                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest/50'
-              }`}
-            >
-              <span className="font-medium">Tema Scuro</span>
-              <div className={`w-5 h-5 rounded-full border-2 ${theme === 'dark' ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
-                {theme === 'dark' && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-on-primary rounded-full"></div></div>}
-              </div>
-            </button>
+            {([
+              { id: 'light', label: 'Tema Chiaro', hint: '' },
+              { id: 'dark', label: 'Tema Scuro', hint: '' },
+              { id: 'system', label: 'Automatico', hint: 'Segue le impostazioni del telefono' },
+            ] as { id: ThemePreference; label: string; hint: string }[]).map(option => (
+              <button
+                key={option.id}
+                onClick={() => onThemeChange(option.id)}
+                aria-pressed={theme === option.id}
+                className={`w-full flex items-center justify-between gap-4 p-4 min-h-[56px] rounded-xl transition-all text-left ${
+                  theme === option.id
+                    ? 'bg-surface-container-lowest text-on-surface border-2 border-primary shadow-sm'
+                    : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-highest/50'
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block font-medium">{option.label}</span>
+                  {option.hint && <span className="block text-xs text-on-surface-variant font-normal">{option.hint}</span>}
+                </span>
+                <div className={`w-5 h-5 shrink-0 rounded-full border-2 ${theme === option.id ? 'border-primary bg-primary' : 'border-outline-variant'}`}>
+                  {theme === option.id && <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-on-primary rounded-full"></div></div>}
+                </div>
+              </button>
+            ))}
           </div>
         </div>
 

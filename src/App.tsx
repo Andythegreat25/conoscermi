@@ -17,7 +17,7 @@ import { PinLock } from './components/PinLock';
 import { SplashScreen } from './components/SplashScreen';
 import { QuickJournal } from './components/QuickJournal';
 import { EveningNote } from './components/EveningNote';
-import { DiaryEntry } from './types';
+import { DiaryEntry, ThemePreference } from './types';
 import { Toaster, toast } from 'sonner';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { RefreshCw } from 'lucide-react';
@@ -90,7 +90,19 @@ export default function App() {
   const [eveningReminderEnabled, setEveningReminderEnabled] = useState(false);
   const [eveningReminderHour, setEveningReminderHour] = useState(21);
   const [dismissedDate, setDismissedDate] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<ThemePreference>('light');
+  // Con il tema "Automatico" l'app segue il telefono, anche mentre è aperta (per esempio al tramonto)
+  const [systemDark, setSystemDark] = useState(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!query) return;
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+  const isDark = theme === 'dark' || (theme === 'system' && systemDark);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -149,7 +161,7 @@ export default function App() {
         if (settings.eveningReminderEnabled !== undefined) setEveningReminderEnabled(settings.eveningReminderEnabled);
         if (settings.eveningReminderHour !== undefined) setEveningReminderHour(settings.eveningReminderHour);
         if (settings.dismissedDate !== undefined) setDismissedDate(settings.dismissedDate);
-        if (settings.theme) setTheme(settings.theme);
+        if (['light', 'dark', 'system'].includes(settings.theme)) setTheme(settings.theme);
         if (settings.avatarUrl) setAvatarUrl(settings.avatarUrl);
       } catch (e) {
         console.error("Failed to parse settings", e);
@@ -167,7 +179,7 @@ export default function App() {
 
   // Apply theme to document
   useEffect(() => {
-    if (theme === 'dark') {
+    if (isDark) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
@@ -175,8 +187,8 @@ export default function App() {
     // La barra di stato del telefono prende il colore dello sfondo dell'app
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#141411' : '#fdf9f3');
-  }, [theme]);
+      ?.setAttribute('content', isDark ? '#141411' : '#fdf9f3');
+  }, [isDark]);
 
   // Quando una nuova versione prende il controllo, ricarica la pagina per mostrarla.
   // Se stai scrivendo aspetta, e dopo il ricaricamento non richiede di nuovo il PIN.
@@ -356,6 +368,16 @@ export default function App() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [location.pathname, showQuickJournal, showSettings, showMotivations]);
 
+  // Scorciatoia "Nuovo pensiero" dall'icona dell'app (/#/diary?new=1): apre direttamente il form.
+  // Se l'app è bloccata il form compare appena inserisci il PIN.
+  useEffect(() => {
+    if (location.pathname !== '/diary') return;
+    if (new URLSearchParams(location.search).get('new') !== '1') return;
+    setEditingEntry(null);
+    setShowQuickJournal(true);
+    navigate('/diary', { replace: true });
+  }, [location.pathname, location.search, navigate]);
+
   // Save entries to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('diary_entries', JSON.stringify(entries));
@@ -365,7 +387,7 @@ export default function App() {
     reminders: boolean,
     hour: number,
     dismissed: string | null,
-    currentTheme: 'light' | 'dark',
+    currentTheme: ThemePreference,
     currentAvatar: string | null,
     eveningReminders: boolean,
     eveningHour: number,
@@ -448,7 +470,7 @@ export default function App() {
     });
   };
 
-  const handleThemeChange = (newTheme: 'light' | 'dark') => {
+  const handleThemeChange = (newTheme: ThemePreference) => {
     setTheme(newTheme);
     saveSettingsLocally(remindersEnabled, reminderHour, dismissedDate, newTheme, avatarUrl, eveningReminderEnabled, eveningReminderHour);
   };
@@ -684,7 +706,12 @@ export default function App() {
             onDeleteEntry={handleDeleteEntry}
           />
         } />
-        <Route path="/journey" element={<Journey entries={entries} />} />
+        <Route path="/journey" element={
+          <Journey
+            entries={entries}
+            onOpenDiaryEntry={(entryId) => navigate('/diary', { state: { focusEntryId: entryId } })}
+          />
+        } />
         <Route path="/echoes" element={<Echoes />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

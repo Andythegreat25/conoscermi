@@ -2,6 +2,7 @@ import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Mo
 import { Mood, DiaryEntry } from '../types';
 import { useMemo } from 'react';
 import { calculateStreak, hasCheckedInToday } from '../utils/streak';
+import { findTimeCapsule } from '../utils/insights';
 
 interface HomeProps {
   onNavigateToDiary: () => void;
@@ -50,26 +51,8 @@ export function Home({
 
   const dailyQuote = getDailyQuote();
 
-  // ── #5 Time Capsule — usa timestamp invece della stringa date ──────────────
-  const timeCapsuleEntry = useMemo(() => {
-    if (!entries || entries.length === 0) return null;
-
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    for (const days of [30, 365]) {
-      const targetDate = new Date(now);
-      targetDate.setDate(targetDate.getDate() - days);
-
-      const start = new Date(targetDate); start.setHours(0, 0, 0, 0);
-      const end   = new Date(targetDate); end.setHours(23, 59, 59, 999);
-
-      const entry = entries.find(e => e.timestamp >= start.getTime() && e.timestamp <= end.getTime());
-      if (entry) return { entry, daysAgo: days };
-    }
-
-    return null;
-  }, [entries]);
+  // Capsula del tempo: un pensiero di un anno, tre mesi o un mese fa, con qualche giorno di margine
+  const timeCapsuleEntry = useMemo(() => findTimeCapsule(entries), [entries]);
 
   const streak = calculateStreak(entries);
   const checkedInToday = hasCheckedInToday(entries);
@@ -216,7 +199,7 @@ export function Home({
               <div>
                 <h3 className="text-sm font-bold text-on-surface uppercase tracking-wider">Capsula del Tempo</h3>
                 <p className="text-[10px] text-on-surface-variant font-medium uppercase tracking-widest">
-                  {timeCapsuleEntry.daysAgo === 30 ? "Un mese fa" : "Un anno fa"} • {timeCapsuleEntry.entry.date}
+                  {timeCapsuleEntry.label} • {timeCapsuleEntry.entry.date}
                 </p>
               </div>
             </div>

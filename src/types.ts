@@ -1,3 +1,6 @@
+/** Scelta del tema: chiaro, scuro oppure "system" (segue le impostazioni del telefono). */
+export type ThemePreference = 'light' | 'dark' | 'system';
+
 export type Mood = 'Difficile' | 'Arrabbiato' | 'Neutro' | 'Meglio' | 'Forte';
 
 export interface DiaryEntry {
