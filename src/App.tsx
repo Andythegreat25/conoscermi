@@ -1,14 +1,17 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { TopBar } from './components/TopBar';
 import { BottomNav, Tab } from './components/BottomNav';
 import { Home } from './components/Home';
 import { CheckIn } from './components/CheckIn';
 import { Diary } from './components/Diary';
-import { Journey } from './components/Journey';
-import { Echoes } from './components/Echoes';
-import { Motivations } from './components/Motivations';
-import { Settings } from './components/Settings';
+// Le schermate usate meno si caricano quando servono: l'app parte con meno codice da leggere.
+// I file restano comunque nel service worker, quindi funzionano anche offline.
+const Journey = lazy(() => import('./components/Journey').then(m => ({ default: m.Journey })));
+const Echoes = lazy(() => import('./components/Echoes').then(m => ({ default: m.Echoes })));
+const Motivations = lazy(() => import('./components/Motivations').then(m => ({ default: m.Motivations })));
+const Settings = lazy(() => import('./components/Settings').then(m => ({ default: m.Settings })));
+const Breathing = lazy(() => import('./components/Breathing').then(m => ({ default: m.Breathing })));
 import { ReminderBanner } from './components/ReminderBanner';
 import { PinLock } from './components/PinLock';
 import { SplashScreen } from './components/SplashScreen';
@@ -21,7 +24,6 @@ import { RefreshCw } from 'lucide-react';
 import { saveReminderSettings, saveEveningReminderSettings } from './utils/db';
 import { hasCheckedInToday } from './utils/streak';
 import { parseBackup, mergeEntries } from './utils/backup';
-import { Breathing } from './components/Breathing';
 import { hasPin as readHasPin, getAutoLockMinutes } from './utils/pin';
 import {
   CURRENT_BUILD,
@@ -723,7 +725,7 @@ export default function App() {
               : 'pt-[calc(6rem+env(safe-area-inset-top))]'
           }`}
         >
-          {renderContent()}
+          <Suspense fallback={null}>{renderContent()}</Suspense>
         </main>
 
         {/* Evening Note Modal */}
@@ -735,7 +737,11 @@ export default function App() {
           />
         )}
 
-        {showBreathing && <Breathing onClose={() => setShowBreathing(false)} />}
+        {showBreathing && (
+          <Suspense fallback={null}>
+            <Breathing onClose={() => setShowBreathing(false)} />
+          </Suspense>
+        )}
 
         {!showSettings && !showQuickJournal && !showMotivations && (
           <BottomNav

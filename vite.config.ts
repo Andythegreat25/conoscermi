@@ -43,6 +43,17 @@ export default defineConfig(() => {
         srcDir: 'src',
         filename: 'sw.ts',
         registerType: 'prompt',
+        injectManifest: {
+          // Il PDF si usa raramente e pesa circa 600 KB: non si scarica con la prima installazione.
+          // Il service worker lo mette in cache la prima volta che esporti (vedi sw.ts).
+          globIgnores: [
+            '**/node_modules/**/*',
+            'assets/jspdf*',
+            'assets/html2canvas*',
+            'assets/purify*',
+            'assets/index.es-*',
+          ],
+        },
         includeAssets: ['icon.svg', 'apple-touch-icon.png'],
         manifest: {
           name: 'Conoscermi',
@@ -65,6 +76,21 @@ export default defineConfig(() => {
       __BUILD_ID__: JSON.stringify(buildId),
       __BUILD_LABEL__: JSON.stringify(buildLabel),
       __BUILD_TIME__: JSON.stringify(buildTime),
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          // Le librerie cambiano di rado, il codice dell'app a ogni deploy. In file separati,
+          // a ogni aggiornamento il telefono riscarica solo il codice dell'app, non tutto.
+          manualChunks(id: string) {
+            if (!id.includes('node_modules')) return undefined;
+            if (/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom)\//.test(id)) return 'react';
+            if (/node_modules\/(firebase|@firebase)\//.test(id)) return 'firebase';
+            if (/node_modules\/(motion|motion-dom|motion-utils|framer-motion)\//.test(id)) return 'motion';
+            return undefined;
+          },
+        },
+      },
     },
     resolve: {
       alias: {

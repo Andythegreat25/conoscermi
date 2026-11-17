@@ -2,6 +2,9 @@
 
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { clientsClaim } from 'workbox-core';
+import { registerRoute } from 'workbox-routing';
+import { CacheFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -20,6 +23,16 @@ self.addEventListener('message', (event) => {
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 clientsClaim();
+
+// I file dell'esportazione PDF (circa 600 KB) non si scaricano con l'installazione: si scaricano
+// la prima volta che esporti e da lì restano in cache, quindi poi funzionano anche offline.
+registerRoute(
+  ({ url }) => /\/assets\/(jspdf|html2canvas|purify|index\.es)[^/]*\.js$/.test(url.pathname),
+  new CacheFirst({
+    cacheName: 'pdf-export',
+    plugins: [new ExpirationPlugin({ maxEntries: 8, maxAgeSeconds: 60 * 24 * 60 * 60 })],
+  }),
+);
 
 interface ReminderPushPayload {
   title?: string;
