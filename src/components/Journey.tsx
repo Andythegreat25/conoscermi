@@ -1,4 +1,4 @@
-import { PenSquare, Heart, Flame, Leaf, Award, Star, Sparkles, Trophy, Gem } from 'lucide-react';
+import { PenSquare, Heart, Flame, Leaf, Award, Sprout, Trophy, Gem } from 'lucide-react';
 import { DiaryEntry, Mood } from '../types';
 import { calculateStreak, calculateMaxStreak } from '../utils/streak';
 
@@ -8,7 +8,7 @@ interface JourneyProps {
 
 const MILESTONES = [
   { days: 7,   label: '7 Giorni',   Icon: Award,    gradient: 'from-secondary to-tertiary',               textColor: 'text-white' },
-  { days: 30,  label: '30 Giorni',  Icon: Star,     gradient: 'from-primary to-primary-container',         textColor: 'text-white' },
+  { days: 30,  label: '30 Giorni',  Icon: Sprout,   gradient: 'from-primary to-primary-container',         textColor: 'text-white' },
   { days: 90,  label: '90 Giorni',  Icon: Flame,    gradient: 'from-secondary to-primary-container',       textColor: 'text-white' },
   { days: 180, label: '180 Giorni', Icon: Gem,      gradient: 'from-tertiary to-secondary',                textColor: 'text-white' },
   { days: 365, label: '1 Anno',     Icon: Trophy,   gradient: 'from-primary to-tertiary',                  textColor: 'text-white' },

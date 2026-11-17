@@ -1,4 +1,4 @@
-import { Heart, Zap, Sparkles, Leaf, Sun, Pin, Quote, Star, X } from 'lucide-react';
+import { Heart, Zap, Leaf, Sun, Pin, Quote, X, Mountain, Sunrise } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 
 interface QuoteData {
@@ -25,9 +25,9 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Pace interiore': 'leaf',
   'Forza': 'zap',
   'Pazienza': 'pin',
-  'Coraggio': 'sparkles',
+  'Coraggio': 'mountain',
   'Consapevolezza': 'sun',
-  'Speranza': 'sparkles',
+  'Speranza': 'sunrise',
   'Amore proprio': 'heart',
   'Crescita': 'leaf',
 };
@@ -170,7 +170,8 @@ export function Motivations({ onClose }: MotivationsProps) {
     switch (iconName) {
       case 'heart': return <Heart size={size} className={className} />;
       case 'zap': return <Zap size={size} className={className} />;
-      case 'sparkles': return <Sparkles size={size} className={className} />;
+      case 'mountain': return <Mountain size={size} className={className} />;
+      case 'sunrise': return <Sunrise size={size} className={className} />;
       case 'leaf': return <Leaf size={size} className={className} />;
       case 'sun': return <Sun size={size} className={className} />;
       case 'pin': return <Pin size={size} className={className} />;
@@ -211,7 +212,7 @@ export function Motivations({ onClose }: MotivationsProps) {
                 : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'
             }`}
           >
-            {cat === 'Preferiti' && <Star size={14} fill={activeCategory === 'Preferiti' ? 'currentColor' : 'none'} />}
+            {cat === 'Preferiti' && <Heart size={14} fill={activeCategory === 'Preferiti' ? 'currentColor' : 'none'} />}
             {cat}
           </button>
         ))}
@@ -299,7 +300,7 @@ export function Motivations({ onClose }: MotivationsProps) {
           {filteredQuotes?.length === 0 ? (
             <div className="py-20 text-center space-y-4">
               <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto text-outline-variant">
-                <Star size={32} />
+                <Heart size={32} />
               </div>
               <p className="text-on-surface-variant font-medium">
                 {activeCategory === 'Preferiti'

@@ -1,4 +1,4 @@
-import { Settings, Sparkles } from 'lucide-react';
+import { Settings, Flower2 } from 'lucide-react';
 import { DefaultAvatar } from './DefaultAvatar';
 
 interface TopBarProps {
@@ -31,7 +31,7 @@ export function TopBar({ title, onSettingsClick, onMotivationsClick, avatarUrl }
               aria-label="Motivazioni"
               className="w-11 h-11 flex items-center justify-center rounded-full text-primary hover:bg-primary/10 transition-[background-color,transform] duration-200 active:scale-95 shrink-0"
             >
-              <Sparkles size={24} />
+              <Flower2 size={24} />
             </button>
           </div>
           <h1 className="font-bold tracking-tight text-lg text-primary truncate px-2">{title}</h1>

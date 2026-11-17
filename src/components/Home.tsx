@@ -90,7 +90,7 @@ export function Home({
     if (!checkedInToday) return "check-in per continuare!";
     if (streak === 1 && totalEntries <= 1) return "Primo giorno! 🌱";
     if (streak === 1 && totalEntries > 1) return "Ripartita oggi 💪";
-    return "ce la stai facendo ✨";
+    return "ce la stai facendo";
   })();
 
   const progressLabel = streak > 0 && progressMax !== streak

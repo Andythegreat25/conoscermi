@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useScrollLock } from '../utils/useScrollLock';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -36,6 +37,8 @@ export function ConfirmDialog({
 
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
+
+  useScrollLock(open);
 
   useEffect(() => {
     if (!open) return;

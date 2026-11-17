@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, PenSquare, Sparkles, CheckCircle2, Lightbulb } from 'lucide-react';
+import { ArrowLeft, PenSquare, Heart, CheckCircle2, Lightbulb } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
 
 const MOODS: { id: Mood; emoji: string; label: string }[] = [
@@ -7,7 +7,7 @@ const MOODS: { id: Mood; emoji: string; label: string }[] = [
   { id: 'Arrabbiato', emoji: '😤', label: 'Arrabbiato' },
   { id: 'Neutro', emoji: '😐', label: 'Neutro' },
   { id: 'Meglio', emoji: '🌱', label: 'Meglio' },
-  { id: 'Forte', emoji: '✨', label: 'Forte' },
+  { id: 'Forte', emoji: '🌳', label: 'Forte' },
 ];
 
 const PROMPTS = [
@@ -101,7 +101,7 @@ export function QuickJournal({ onSave, onBack, initialEntry }: QuickJournalProps
 
       <section className="space-y-4">
         <div className="flex items-center gap-2 text-primary">
-          <Sparkles size={20} />
+          <Heart size={20} />
           <h3 className="font-bold">Come ti senti mentre scrivi?</h3>
         </div>
         <div className="flex justify-between gap-2">

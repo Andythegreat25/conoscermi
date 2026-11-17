@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PenSquare, CheckCircle2, Sparkles, RefreshCw } from 'lucide-react';
+import { PenSquare, CheckCircle2, Feather, RefreshCw } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
 
 const MOODS: { id: Mood; emoji: string; label: string; desc: string }[] = [
@@ -7,7 +7,7 @@ const MOODS: { id: Mood; emoji: string; label: string; desc: string }[] = [
   { id: 'Arrabbiato', emoji: '😤', label: 'Arrabbiato', desc: 'Sento tensione e frustrazione.' },
   { id: 'Neutro', emoji: '😐', label: 'Neutro', desc: 'In equilibrio, senza scossoni.' },
   { id: 'Meglio', emoji: '🌱', label: 'Meglio', desc: 'Vedo la luce e sento speranza.' },
-  { id: 'Forte', emoji: '✨', label: 'Forte', desc: 'Ho il controllo e mi sento bene.' },
+  { id: 'Forte', emoji: '🌳', label: 'Forte', desc: 'Ho il controllo e mi sento bene.' },
 ];
 
 const PROMPTS = [
@@ -113,7 +113,7 @@ export function CheckIn({ onSave }: CheckInProps) {
         <div className="bg-primary/5 rounded-2xl p-6 border border-primary/10 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-primary">
-              <Sparkles size={18} />
+              <Feather size={18} />
               <span className="text-xs font-bold uppercase tracking-widest">Spunto del giorno</span>
             </div>
             <button 

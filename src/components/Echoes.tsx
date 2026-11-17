@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, ChangeEvent } from 'react';
-import { MessageCircle, Upload, Send, User, Sparkles, Trash2, ArrowLeft, Info, Loader2 } from 'lucide-react';
+import { MessageCircle, Upload, Send, User, MessageCircleHeart, Trash2, ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { EchoMessage, Persona } from '../types';
 import { GoogleGenAI } from "@google/genai";
 import { toast } from 'sonner';
@@ -214,7 +214,7 @@ export function Echoes({ apiKey }: EchoesProps) {
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
         <header className="space-y-2">
           <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-4">
-            <Sparkles size={24} />
+            <MessageCircleHeart size={24} />
           </div>
           <h2 className="text-3xl font-extrabold text-on-surface tracking-tight leading-tight">Echi del Cuore</h2>
           <p className="text-on-surface-variant text-base leading-relaxed">

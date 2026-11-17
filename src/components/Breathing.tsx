@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Play, Pause, RotateCcw, Wind } from 'lucide-react';
+import { useScrollLock } from '../utils/useScrollLock';
 
 type PatternId = '478' | 'box';
 type PhaseKey = 'inhale' | 'hold' | 'exhale' | 'rest';
@@ -107,6 +108,8 @@ export function Breathing({ onClose }: BreathingProps) {
 
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+
+  useScrollLock(true);
 
   // Esc chiude la vista
   useEffect(() => {
