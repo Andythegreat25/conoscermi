@@ -22,11 +22,18 @@ import { saveReminderSettings, saveEveningReminderSettings } from './utils/db';
 import { hasCheckedInToday } from './utils/streak';
 import { parseBackup, mergeEntries } from './utils/backup';
 import { Breathing } from './components/Breathing';
+import {
+  CURRENT_BUILD,
+  UPDATES_ENABLED,
+  fetchLatestBuild,
+  hardUpdate,
+  markUpdateAttempt,
+  shouldAttemptUpdate,
+} from './utils/updates';
 import { localDateKey, recordReminderActivity, syncPushPreferences } from './utils/push';
 
 export default function App() {
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
-  const needRefreshRef = useRef(false);
 
   const {
     offlineReady: [offlineReady, setOfflineReady],
@@ -47,11 +54,6 @@ export default function App() {
     },
   });
 
-  // Keep ref in sync so handleCheckUpdates can read the latest value
-  useEffect(() => {
-    needRefreshRef.current = needRefresh;
-  }, [needRefresh]);
-
   useEffect(() => {
     if (offlineReady) {
       toast.success('App pronta per l\'uso offline', {
@@ -61,37 +63,6 @@ export default function App() {
       setOfflineReady(false);
     }
   }, [offlineReady, setOfflineReady]);
-
-  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
-
-  const handleCheckUpdates = async () => {
-    setIsCheckingUpdates(true);
-    const toastId = toast.loading('Ricerca aggiornamenti in corso…');
-    try {
-      if (swRegistrationRef.current) {
-        await swRegistrationRef.current.update();
-      }
-      // Wait up to 2 s for the SW update event to fire and set needRefresh
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      toast.dismiss(toastId);
-      if (needRefreshRef.current) {
-        // Nuovo SW trovato → attivalo subito e ricarica
-        toast.loading('Aggiornamento in corso…');
-        try {
-          await updateServiceWorker(false); // invia SKIP_WAITING senza fare il reload
-        } finally {
-          window.location.reload(); // garantiamo sempre il reload
-        }
-      } else {
-        toast.success('App già aggiornata ✓');
-      }
-    } catch {
-      toast.dismiss(toastId);
-      toast.error('Impossibile verificare gli aggiornamenti');
-    } finally {
-      setIsCheckingUpdates(false);
-    }
-  };
 
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasPin, setHasPin] = useState<boolean | null>(null);
@@ -239,13 +210,105 @@ export default function App() {
     return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
   }, []);
 
+  // ── Controllo versione tramite version.json ─────────────────────────────
+  // Indipendente dal service worker: confronta la versione in uso con quella online,
+  // all'apertura, quando l'app torna in primo piano e ogni 30 secondi.
+  const pendingUpdateIdRef = useRef<string | null>(null);
+
+  const applyHardUpdate = (targetId: string) => {
+    markUpdateAttempt(targetId);
+    hardUpdate(() => {
+      // Resta sbloccata dopo il ricaricamento solo se lo era davvero (vedi reloadForUpdate)
+      if (isUnlockedRef.current) {
+        try { sessionStorage.setItem('resume_unlocked', String(Date.now())); } catch { /* noop */ }
+      }
+    });
+  };
+
+  const checkForNewBuild = async () => {
+    if (!UPDATES_ENABLED) return;
+    const latest = await fetchLatestBuild();
+    if (!latest || latest.id === CURRENT_BUILD.id) return;
+    if (!shouldAttemptUpdate(latest.id)) return;
+    if (isWritingRef.current) {
+      // Non interrompe chi sta scrivendo: aggiorna appena esce dal diario o dalla nota
+      pendingUpdateIdRef.current = latest.id;
+      toast('Aggiornamento pronto', {
+        id: 'update-ready',
+        description: 'L\'app si aggiornerà appena finisci di scrivere.',
+        duration: Infinity,
+      });
+      return;
+    }
+    toast.loading('Aggiornamento in corso…', { id: 'update-applying' });
+    applyHardUpdate(latest.id);
+  };
+
+  const checkForNewBuildRef = useRef(checkForNewBuild);
+  checkForNewBuildRef.current = checkForNewBuild;
+
+  useEffect(() => {
+    if (!UPDATES_ENABLED) return;
+    const run = () => { void checkForNewBuildRef.current(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') run(); };
+
+    run();
+    const interval = window.setInterval(onVisible, 30_000);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', run);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', run);
+    };
+  }, []);
+
   useEffect(() => {
     isWritingRef.current = isWriting;
-    if (!isWriting && reloadPendingRef.current) {
+    if (isWriting) return;
+    if (pendingUpdateIdRef.current) {
+      const id = pendingUpdateIdRef.current;
+      pendingUpdateIdRef.current = null;
+      toast.dismiss('update-ready');
+      applyHardUpdate(id);
+      return;
+    }
+    if (reloadPendingRef.current) {
       reloadPendingRef.current = false;
       reloadForUpdate();
     }
   }, [isWriting]);
+
+  // Pulsante "Controlla aggiornamenti" nelle Impostazioni
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+
+  const handleCheckUpdates = async () => {
+    setIsCheckingUpdates(true);
+    const toastId = toast.loading('Ricerca aggiornamenti in corso…');
+    try {
+      if (!UPDATES_ENABLED) {
+        toast.info('In sviluppo gli aggiornamenti sono disattivati', { id: toastId });
+        return;
+      }
+      // In parallelo si chiede anche al service worker di cercare, per tenerlo allineato
+      swRegistrationRef.current?.update().catch(() => {});
+
+      const latest = await fetchLatestBuild(10_000);
+      if (!latest) {
+        toast.error('Impossibile verificare. Sei offline?', { id: toastId });
+      } else if (latest.id === CURRENT_BUILD.id) {
+        toast.success(`App aggiornata (versione ${CURRENT_BUILD.label})`, { id: toastId });
+      } else {
+        toast.loading('Nuova versione trovata, aggiorno…', { id: toastId });
+        // Il pulsante ignora il limite di tentativi: se lo premi, aggiorna davvero
+        applyHardUpdate(latest.id);
+      }
+    } catch {
+      toast.error('Impossibile verificare gli aggiornamenti', { id: toastId });
+    } finally {
+      setIsCheckingUpdates(false);
+    }
+  };
 
   // A ogni cambio di vista (tab, diario, impostazioni, motivazioni) si riparte dall'alto,
   // altrimenti la pagina resta alla posizione di scroll della schermata precedente.

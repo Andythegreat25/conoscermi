@@ -4,12 +4,40 @@ import path from 'path';
 import { fileURLToPath } from 'node:url';
 import {defineConfig, loadEnv} from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execFileSync } from 'node:child_process';
+
+// Identificativo della versione: l'hash del commit (su Vercel arriva da VERCEL_GIT_COMMIT_SHA,
+// in locale da git) più l'ora della build, così ogni build risulta una versione diversa.
+function commitLabel(): string {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (sha) return sha.slice(0, 7);
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return 'locale';
+  }
+}
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const buildTime = new Date().toISOString();
+  const buildLabel = commitLabel();
+  const buildId = `${buildLabel}-${Date.now().toString(36)}`;
   return {
     plugins: [
-      react(), 
+      react(),
+      {
+        // Pubblica /version.json accanto all'app: l'app lo confronta con la propria versione
+        // per scoprire subito se online c'è qualcosa di nuovo, senza dipendere dal service worker.
+        name: 'emit-version-json',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'version.json',
+            source: JSON.stringify({ id: buildId, label: buildLabel, time: buildTime }),
+          });
+        },
+      },
       tailwindcss(),
       VitePWA({
         strategies: 'injectManifest',
@@ -36,6 +64,9 @@ export default defineConfig(({mode}) => {
     ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY || ''),
+      __BUILD_ID__: JSON.stringify(buildId),
+      __BUILD_LABEL__: JSON.stringify(buildLabel),
+      __BUILD_TIME__: JSON.stringify(buildTime),
     },
     resolve: {
       alias: {

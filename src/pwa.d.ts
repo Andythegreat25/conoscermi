@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+// Valori fissati da vite.config.ts a ogni build
+declare const __BUILD_ID__: string;
+declare const __BUILD_LABEL__: string;
+declare const __BUILD_TIME__: string;
+
 declare module 'virtual:pwa-register/react' {
   import { Dispatch, SetStateAction } from 'react';
 

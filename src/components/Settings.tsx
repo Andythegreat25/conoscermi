@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { DiaryEntry } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DefaultAvatar } from './DefaultAvatar';
+import { CURRENT_BUILD, formatBuildTime } from '../utils/updates';
 
 interface StorageBreakdown {
   total: string;
@@ -610,6 +611,10 @@ export function Settings({
           <div className="space-y-1">
             <h4 className="font-black text-xl tracking-tight">Conoscermi</h4>
             <p className="text-sm font-medium text-on-surface-variant">Versione 1.2.0 (Aura Calma)</p>
+            <p className="text-xs text-on-surface-variant/70 tabular-nums">
+              Build {CURRENT_BUILD.label}
+              {formatBuildTime(CURRENT_BUILD.time) && ` · ${formatBuildTime(CURRENT_BUILD.time)}`}
+            </p>
           </div>
           <div className="pt-4 space-y-2">
             <p className="text-primary italic font-medium">"Fatto con cura per il tuo percorso."</p>
