@@ -5,6 +5,8 @@ import { calculateStreak, hasCheckedInToday } from '../utils/streak';
 
 interface HomeProps {
   onNavigateToDiary: () => void;
+  /** Apre il Diario già posizionato su una voce precisa (usato dalla capsula del tempo). */
+  onOpenDiaryEntry: (entryId: string) => void;
   onNavigateToCheckIn: () => void;
   onMotivationsClick: () => void;
   lastMood?: Mood;
@@ -17,6 +19,7 @@ interface HomeProps {
 
 export function Home({
   onNavigateToDiary,
+  onOpenDiaryEntry,
   onNavigateToCheckIn,
   onMotivationsClick,
   lastMood,
@@ -228,8 +231,8 @@ export function Home({
               </div>
             </div>
             <button
-              onClick={onNavigateToDiary}
-              className="mt-4 w-full py-2 text-xs font-bold text-secondary uppercase tracking-widest hover:underline underline-offset-4"
+              onClick={() => onOpenDiaryEntry(timeCapsuleEntry.entry.id)}
+              className="mt-4 w-full min-h-[44px] py-2 text-xs font-bold text-secondary uppercase tracking-widest hover:underline underline-offset-4"
             >
               Vedi nel diario →
             </button>

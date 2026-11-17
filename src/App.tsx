@@ -615,6 +615,7 @@ export default function App() {
         <Route path="/" element={
           <Home
             onNavigateToDiary={() => navigate('/diary')}
+            onOpenDiaryEntry={(entryId) => navigate('/diary', { state: { focusEntryId: entryId } })}
             onNavigateToCheckIn={() => navigate('/checkin')}
             onMotivationsClick={() => setShowMotivations(true)}
             lastMood={entries[0]?.mood}

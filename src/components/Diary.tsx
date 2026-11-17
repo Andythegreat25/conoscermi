@@ -1,5 +1,6 @@
 import { Search, Plus, Filter, X, Edit2, Moon, Trash2 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { DiaryEntry, Mood } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -17,6 +18,32 @@ export function Diary({ entries, onAddEntry, onEditEntry, onDeleteEntry }: Diary
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMood, setSelectedMood] = useState<Mood | 'Tutti'>('Tutti');
   const [entryToDelete, setEntryToDelete] = useState<DiaryEntry | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
+  // Arrivo da un link che indica una voce precisa (es. la capsula del tempo della Home):
+  // azzera i filtri, scorre fino a quella voce e la evidenzia per qualche secondo.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const handledFocusRef = useRef<string | null>(null);
+  useEffect(() => {
+    const focusId = (location.state as { focusEntryId?: string } | null)?.focusEntryId;
+    if (!focusId || handledFocusRef.current === focusId) return;
+    handledFocusRef.current = focusId;
+
+    setSearchQuery('');
+    setSelectedMood('Tutti');
+    // Consuma lo stato: tornando indietro o ricaricando non si ripete lo scorrimento
+    navigate(location.pathname, { replace: true, state: null });
+
+    // Aspetta che la pagina sia disegnata e che App abbia riportato lo scroll in cima
+    window.setTimeout(() => {
+      const el = document.getElementById(`entry-${focusId}`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      setHighlightId(focusId);
+      window.setTimeout(() => setHighlightId(null), 4000);
+    }, 350);
+  }, [location.state, location.pathname, navigate]);
 
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
@@ -153,6 +180,7 @@ export function Diary({ entries, onAddEntry, onEditEntry, onDeleteEntry }: Diary
                 {dayEntries.map((entry, i) => (
                   <motion.div
                     key={entry.id}
+                    id={`entry-${entry.id}`}
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -24 }}
@@ -160,7 +188,11 @@ export function Diary({ entries, onAddEntry, onEditEntry, onDeleteEntry }: Diary
                     className="relative pl-10 z-10 group mb-6 last:mb-0"
                   >
                     <div className={`absolute left-[13px] top-1 w-2.5 h-2.5 rounded-full ${getMoodColor(entry.mood)} ring-4 ring-surface`}></div>
-                    <div className="bg-surface-container rounded-lg p-5 transition-all hover:bg-surface-container-high">
+                    <div
+                      className={`bg-surface-container rounded-lg p-5 transition-all hover:bg-surface-container-high ${
+                        highlightId === entry.id ? 'ring-2 ring-primary shadow-lg' : ''
+                      }`}
+                    >
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex flex-col">
                           <span className="text-xs font-bold uppercase tracking-widest text-secondary">{entry.mood}</span>
