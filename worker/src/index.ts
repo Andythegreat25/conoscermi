@@ -279,7 +279,10 @@ async function dispatchReminders(timestamp: number, env: Env): Promise<void> {
 // come accesso libero a Gemini, e ogni utente ha un limite giornaliero.
 
 const DEFAULT_GEMINI_MODEL = 'gemini-3-flash-preview';
-const ECHO_DAILY_LIMIT = 100;
+// Limiti giornalieri su tre livelli. Il solo limite per utente non basta: l'accesso anonimo
+// di Firebase è aperto a tutti, quindi chiunque può crearsi quanti utenti vuole. Il limite
+// per indirizzo di rete e quello globale fissano il massimo che questo endpoint può costare.
+const ECHO_LIMITS = { user: 100, ip: 300, global: 1500 };
 const ECHO_MAX_NAME = 80;
 const ECHO_MAX_MESSAGE = 2000;
 const ECHO_MAX_CONTEXT = 12000;
@@ -298,19 +301,48 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Conta una richiesta. Restituisce false se l'utente ha già esaurito il limite di oggi. */
-async function consumeEchoQuota(env: Env, uid: string): Promise<boolean> {
-  await ensureEchoTable(env);
-  const result = await env.DB.prepare(
-    `INSERT INTO echo_usage (uid, day, count) VALUES (?, ?, 1)
-     ON CONFLICT(uid, day) DO UPDATE SET count = count + 1 WHERE count < ?`,
-  ).bind(uid, today(), ECHO_DAILY_LIMIT).run();
-  return (result.meta.changes ?? 0) === 1;
+interface QuotaEntry {
+  /** Chiave del contatore: utente, indirizzo di rete o "global". La colonna si chiama uid per storia. */
+  key: string;
+  limit: number;
 }
 
-async function refundEchoQuota(env: Env, uid: string): Promise<void> {
-  await env.DB.prepare('UPDATE echo_usage SET count = MAX(count - 1, 0) WHERE uid = ? AND day = ?')
-    .bind(uid, today()).run();
+function quotaEntries(uid: string, request: Request): QuotaEntry[] {
+  // Cloudflare imposta sempre CF-Connecting-IP con l'indirizzo reale del chiamante
+  const ip = request.headers.get('CF-Connecting-IP') || 'sconosciuto';
+  return [
+    { key: `u:${uid}`, limit: ECHO_LIMITS.user },
+    { key: `ip:${ip}`, limit: ECHO_LIMITS.ip },
+    { key: 'global', limit: ECHO_LIMITS.global },
+  ];
+}
+
+/**
+ * Conta una richiesta su tutti e tre i livelli. Se uno è già al limite non consuma niente
+ * (restituisce i conteggi già presi) e risponde false.
+ */
+async function consumeEchoQuota(env: Env, entries: QuotaEntry[]): Promise<boolean> {
+  await ensureEchoTable(env);
+  const taken: string[] = [];
+  for (const { key, limit } of entries) {
+    const result = await env.DB.prepare(
+      `INSERT INTO echo_usage (uid, day, count) VALUES (?, ?, 1)
+       ON CONFLICT(uid, day) DO UPDATE SET count = count + 1 WHERE count < ?`,
+    ).bind(key, today(), limit).run();
+    if ((result.meta.changes ?? 0) !== 1) {
+      await refundEchoQuota(env, taken);
+      return false;
+    }
+    taken.push(key);
+  }
+  return true;
+}
+
+async function refundEchoQuota(env: Env, keys: string[]): Promise<void> {
+  for (const key of keys) {
+    await env.DB.prepare('UPDATE echo_usage SET count = MAX(count - 1, 0) WHERE uid = ? AND day = ?')
+      .bind(key, today()).run();
+  }
 }
 
 function readEchoText(value: unknown, max: number, truncateFromStart = false): string {
@@ -370,14 +402,16 @@ async function echo(request: Request, env: Env, origin: string): Promise<Respons
   const message = readEchoText(data.message, ECHO_MAX_MESSAGE);
 
   if (!env.GEMINI_API_KEY) throw new Error('NOT_CONFIGURED');
-  if (!await consumeEchoQuota(env, uid)) {
+
+  const quota = quotaEntries(uid, request);
+  if (!await consumeEchoQuota(env, quota)) {
     return response({ error: 'Hai raggiunto il limite di messaggi di oggi. Riprova domani.' }, 429, origin);
   }
 
   try {
     return response({ text: await askGemini(env, name, context, message) }, 200, origin);
   } catch (error) {
-    await refundEchoQuota(env, uid); // un errore del servizio non deve consumare il limite
+    await refundEchoQuota(env, quota.map(entry => entry.key)); // un errore del servizio non consuma i limiti
     throw error;
   }
 }
