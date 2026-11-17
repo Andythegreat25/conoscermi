@@ -12,6 +12,11 @@ import {
 interface PinLockProps {
   onUnlock: () => void;
   isSetup?: boolean;
+  /** Titolo e testo alternativi, per usare la schermata come verifica del PIN attuale. */
+  title?: string;
+  subtitle?: string;
+  /** Se presente compare "Annulla": serve quando la schermata si apre da dentro l'app. */
+  onCancel?: () => void;
 }
 
 function formatPause(ms: number): string {
@@ -20,7 +25,7 @@ function formatPause(ms: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-export function PinLock({ onUnlock, isSetup = false }: PinLockProps) {
+export function PinLock({ onUnlock, isSetup = false, title, subtitle, onCancel }: PinLockProps) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [step, setStep] = useState<'enter' | 'confirm'>('enter');
@@ -32,6 +37,12 @@ export function PinLock({ onUnlock, isSetup = false }: PinLockProps) {
 
   // La schermata copre tutta la pagina: lo sfondo non deve scorrere
   useScrollLock(true);
+
+  // Il focus passa dentro la schermata, così da tastiera non si finisce nell'app sotto
+  const firstKeyRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    firstKeyRef.current?.focus();
+  }, []);
 
   // Conto alla rovescia durante la pausa dopo troppi errori
   useEffect(() => {
@@ -108,7 +119,12 @@ export function PinLock({ onUnlock, isSetup = false }: PinLockProps) {
     'w-16 h-16 rounded-full bg-surface-container-low text-2xl font-bold text-on-surface hover:bg-surface-container-high active:scale-90 transition-all flex items-center justify-center mx-auto disabled:opacity-40 disabled:active:scale-100';
 
   return (
-    <div className="fixed inset-0 bg-surface z-[100] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isSetup ? 'Imposta il PIN' : 'Inserisci il PIN'}
+      className="fixed inset-0 bg-surface z-[100] flex flex-col items-center justify-center p-6 animate-in fade-in duration-500"
+    >
       <div className="w-full max-w-[320px] space-y-12 text-center">
         <div className="space-y-4 flex flex-col items-center">
           <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-2">
@@ -117,12 +133,12 @@ export function PinLock({ onUnlock, isSetup = false }: PinLockProps) {
           <h2 className="text-2xl font-black text-on-surface tracking-tight">
             {isSetup
               ? (step === 'enter' ? 'Imposta il tuo PIN' : 'Conferma il tuo PIN')
-              : 'Bentornato'}
+              : (title ?? 'Bentornato')}
           </h2>
           <p className="text-on-surface-variant text-sm font-medium">
             {isSetup
               ? 'Scegli un codice a 6 cifre per proteggere il tuo diario.'
-              : 'Inserisci il tuo codice per accedere.'}
+              : (subtitle ?? 'Inserisci il tuo codice per accedere.')}
           </p>
         </div>
 
@@ -155,6 +171,7 @@ export function PinLock({ onUnlock, isSetup = false }: PinLockProps) {
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
             <button
               key={num}
+              ref={num === '1' ? firstKeyRef : undefined}
               onClick={() => handleNumberClick(num)}
               disabled={locked}
               className={keyClass}
@@ -189,6 +206,15 @@ export function PinLock({ onUnlock, isSetup = false }: PinLockProps) {
             </div>
           </button>
         </div>
+
+        {onCancel && !isSetup && (
+          <button
+            onClick={onCancel}
+            className="text-primary font-bold text-sm uppercase tracking-widest min-h-[44px] px-4"
+          >
+            Annulla
+          </button>
+        )}
 
         {isSetup && step === 'confirm' && (
           <button

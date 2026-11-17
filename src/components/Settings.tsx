@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { toast } from 'sonner';
 import { DiaryEntry } from '../types';
 import { ConfirmDialog } from './ConfirmDialog';
+import { PinLock } from './PinLock';
 import { DefaultAvatar } from './DefaultAvatar';
 import { CURRENT_BUILD, formatBuildTime } from '../utils/updates';
 import { wipeAllData } from '../utils/wipe';
@@ -61,7 +62,8 @@ export function Settings({
   const [storageBreakdown, setStorageBreakdown] = useState<StorageBreakdown | null>(null);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isUpdatingReminder, setIsUpdatingReminder] = useState(false);
-  const [pendingConfirm, setPendingConfirm] = useState<'clear' | 'pin' | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<'clear' | null>(null);
+  const [verifyingPin, setVerifyingPin] = useState(false);
   const [autoLock, setAutoLock] = useState<number>(() => getAutoLockMinutes());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -384,7 +386,7 @@ export function Settings({
             <h3 className="font-bold text-lg">Sicurezza</h3>
           </div>
           <button
-            onClick={() => setPendingConfirm('pin')}
+            onClick={() => setVerifyingPin(true)}
             className="w-full flex items-center justify-between p-4 rounded-xl bg-surface-container-lowest text-on-surface hover:bg-surface-container-highest transition-colors"
           >
             <span className="font-medium">Cambia PIN di accesso</span>
@@ -661,14 +663,16 @@ export function Settings({
         onCancel={() => setPendingConfirm(null)}
         onConfirm={handleClearAll}
       />
-      <ConfirmDialog
-        open={pendingConfirm === 'pin'}
-        title="Cambiare il PIN?"
-        message="Verrai disconnesso e dovrai impostare un nuovo PIN."
-        confirmLabel="Cambia PIN"
-        onCancel={() => setPendingConfirm(null)}
-        onConfirm={handleChangePin}
-      />
+
+      {/* Per cambiare il PIN serve prima quello attuale: la schermata verifica e poi prosegue */}
+      {verifyingPin && (
+        <PinLock
+          title="Cambia PIN"
+          subtitle="Inserisci il PIN attuale per continuare. Poi ne sceglierai uno nuovo."
+          onCancel={() => setVerifyingPin(false)}
+          onUnlock={handleChangePin}
+        />
+      )}
     </div>
   );
 }

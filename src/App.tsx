@@ -206,6 +206,18 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
+  // Mentre il PIN copre l'app, ciò che sta sotto non deve essere raggiungibile nemmeno da
+  // tastiera o lettore di schermo. L'app stessa è resa inerte nel JSX; qui si fa lo stesso con
+  // le finestre che React disegna fuori dall'app (conferme, respirazione guidata).
+  useEffect(() => {
+    if (isUnlocked) return;
+    const outside = Array.from(document.body.children).filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && el.id !== 'root' && !['SCRIPT', 'STYLE'].includes(el.tagName),
+    );
+    outside.forEach((el) => el.setAttribute('inert', ''));
+    return () => outside.forEach((el) => el.removeAttribute('inert'));
+  }, [isUnlocked]);
+
   const reloadForUpdate = () => {
     // Il flag di ripresa si salva solo se l'app è davvero sbloccata in questo momento,
     // altrimenti un aggiornamento arrivato sulla schermata del PIN la aggirerebbe.
@@ -680,7 +692,11 @@ export default function App() {
   return (
     <div className="min-h-dvh bg-surface text-on-surface font-sans selection:bg-primary-container selection:text-on-primary-container flex justify-center">
       <Toaster position="top-center" richColors offset="calc(env(safe-area-inset-top) + 16px)" />
-      <div className="w-full max-w-[430px] relative min-h-dvh pb-[calc(7rem+env(safe-area-inset-bottom))]">
+      <div
+        className="w-full max-w-[430px] relative min-h-dvh pb-[calc(7rem+env(safe-area-inset-bottom))]"
+        inert={!isUnlocked}
+        aria-hidden={!isUnlocked ? true : undefined}
+      >
         {!showSettings && !showQuickJournal && !showMotivations && (
           <TopBar
             title="Conoscermi"
