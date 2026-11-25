@@ -44,6 +44,9 @@ export default defineConfig(() => {
         filename: 'sw.ts',
         registerType: 'prompt',
         injectManifest: {
+          // Oltre ai file di base, il font latino: l'app ha lo stesso aspetto anche offline.
+          // Gli altri alfabeti (cirillico, vietnamita, latino esteso) si scaricano solo se servono.
+          globPatterns: ['**/*.{js,css,html}', 'assets/plus-jakarta-sans-latin-wght-normal*.woff2'],
           // Il PDF si usa raramente e pesa circa 600 KB: non si scarica con la prima installazione.
           // Il service worker lo mette in cache la prima volta che esporti (vedi sw.ts).
           globIgnores: [

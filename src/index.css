@@ -1,8 +1,11 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+/* Font in locale (Plus Jakarta Sans, licenza OFL): nessuna richiesta a Google a ogni apertura
+   e funziona anche offline. Il browser scarica solo l'alfabeto che serve; per l'italiano
+   basta il latino, ed è l'unico precaricato dal service worker (vedi vite.config.ts). */
+@import '@fontsource-variable/plus-jakarta-sans/wght.css';
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 
   --color-primary: #8c4e37;
   --color-on-primary: #ffffff;
@@ -108,7 +111,7 @@ input[type='search']::-webkit-search-decoration {
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', sans-serif;
   background-color: var(--color-surface);
   color: var(--color-on-surface);
   -webkit-tap-highlight-color: transparent;
