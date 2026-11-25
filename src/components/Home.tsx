@@ -1,4 +1,4 @@
-import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Moon, AlertCircle, Wind } from 'lucide-react';
+import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Moon, AlertCircle, Wind, Download } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
 import { useMemo } from 'react';
 import { calculateStreak, hasCheckedInToday } from '../utils/streak';
@@ -16,6 +16,10 @@ interface HomeProps {
   onOpenEveningNote?: () => void;
   todayEveningNote?: string;
   onOpenBreathing?: () => void;
+  /** Se presente, la Home propone di fare un backup. daysSince è null se non ne hai mai fatto uno. */
+  backupReminder?: { daysSince: number | null } | null;
+  onOpenBackup?: () => void;
+  onSnoozeBackup?: () => void;
 }
 
 export function Home({
@@ -28,7 +32,10 @@ export function Home({
   eveningReminderEnabled,
   onOpenEveningNote,
   todayEveningNote,
-  onOpenBreathing
+  onOpenBreathing,
+  backupReminder,
+  onOpenBackup,
+  onSnoozeBackup
 }: HomeProps) {
   const quotes = [
     "Un passo piccolo oggi vale più di un piano perfetto rimandato.",
@@ -139,6 +146,41 @@ export function Home({
           Come mi sento?
         </button>
       </section>
+
+      {/* Promemoria di backup: i pensieri stanno solo su questo dispositivo */}
+      {backupReminder && onOpenBackup && (
+        <section className="bg-primary-container/20 border border-primary/10 rounded-lg p-5 space-y-4">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <Download size={20} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Fai un backup</p>
+              <p className="text-on-surface text-sm mt-0.5 leading-relaxed">
+                {backupReminder.daysSince === null
+                  ? 'I tuoi pensieri stanno solo su questo telefono e non hai ancora un backup.'
+                  : `Non esporti i tuoi pensieri da ${backupReminder.daysSince} giorni. Se perdi il telefono, li perdi con lui.`}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onSnoozeBackup}
+              className="flex-1 min-h-[44px] rounded-full bg-surface-container-highest text-on-surface-variant font-semibold text-sm active:scale-95 transition-transform"
+            >
+              Più tardi
+            </button>
+            <button
+              type="button"
+              onClick={onOpenBackup}
+              className="flex-1 min-h-[44px] rounded-full bg-primary text-on-primary font-semibold text-sm active:scale-95 transition-transform"
+            >
+              Esporta ora
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Guided Breathing Card */}
       {onOpenBreathing && (

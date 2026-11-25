@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { ConfirmDialog } from './ConfirmDialog';
 import { askEcho } from '../utils/echo';
 import { ApiError } from '../utils/api';
+import { safeSetItem } from '../utils/storage';
 
 export function Echoes() {
   const [persona, setPersona] = useState<Persona | null>(null);
@@ -24,8 +25,8 @@ export function Echoes() {
   }, []);
 
   useEffect(() => {
-    if (persona) localStorage.setItem('echo_persona', JSON.stringify(persona));
-    if (messages.length > 0) localStorage.setItem('echo_messages', JSON.stringify(messages));
+    if (persona) safeSetItem('echo_persona', JSON.stringify(persona));
+    if (messages.length > 0) safeSetItem('echo_messages', JSON.stringify(messages));
   }, [persona, messages]);
 
   useEffect(() => {

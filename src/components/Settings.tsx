@@ -7,6 +7,8 @@ import { PinLock } from './PinLock';
 import { DefaultAvatar } from './DefaultAvatar';
 import { CURRENT_BUILD, formatBuildTime } from '../utils/updates';
 import { wipeAllData } from '../utils/wipe';
+import { resizeImageToDataUrl } from '../utils/image';
+import { isStoragePersisted, markBackupDone } from '../utils/storage';
 import { removePin, hasPin, AUTO_LOCK_OPTIONS, getAutoLockMinutes, setAutoLockMinutes } from '../utils/pin';
 
 /** Un'azione delicata che parte solo dopo aver inserito il PIN attuale. */
@@ -72,6 +74,10 @@ export function Settings({
   const [pendingConfirm, setPendingConfirm] = useState<'clear' | null>(null);
   const [pinGate, setPinGate] = useState<PinGate | null>(null);
   const [autoLock, setAutoLock] = useState<number>(() => getAutoLockMinutes());
+  const [persisted, setPersisted] = useState<boolean | null>(null);
+  useEffect(() => {
+    void isStoragePersisted().then(setPersisted);
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
@@ -175,6 +181,7 @@ export function Settings({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    markBackupDone(); // ferma il promemoria di backup della Home per un altro mese
   };
 
   const handleExportPDF = async () => {
@@ -306,14 +313,15 @@ export function Settings({
     setAutoLockMinutes(minutes);
   };
 
-  const handleAvatarUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onAvatarChange(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    e.target.value = ''; // permette di scegliere di nuovo la stessa foto
+    if (!file) return;
+    try {
+      // Ridotta a 256 px: una foto del telefono intera pesa megabyte e occuperebbe lo spazio del diario
+      onAvatarChange(await resizeImageToDataUrl(file));
+    } catch {
+      toast.error('Non riesco a leggere questa immagine. Prova con un\'altra foto.');
     }
   };
 
@@ -603,6 +611,10 @@ export function Settings({
                   <div className="flex justify-between text-xs text-on-surface-variant">
                     <span>⚙️ Impostazioni</span>
                     <span className="font-bold">{storageBreakdown.settings}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-on-surface-variant">
+                    <span>🔒 Archiviazione protetta</span>
+                    <span className="font-bold">{persisted === null ? 'Non disponibile' : persisted ? 'Sì' : 'No'}</span>
                   </div>
                 </div>
               )}

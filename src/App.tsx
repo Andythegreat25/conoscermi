@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { TopBar } from './components/TopBar';
 import { BottomNav, Tab } from './components/BottomNav';
@@ -25,6 +25,8 @@ import { saveReminderSettings, saveEveningReminderSettings } from './utils/db';
 import { hasCheckedInToday } from './utils/streak';
 import { parseBackup, mergeEntries } from './utils/backup';
 import { hasPin as readHasPin, getAutoLockMinutes } from './utils/pin';
+import { safeSetItem, requestPersistentStorage, getBackupReminder, snoozeBackupReminder } from './utils/storage';
+import { resizeImageToDataUrl } from './utils/image';
 import {
   CURRENT_BUILD,
   UPDATES_ENABLED,
@@ -105,6 +107,32 @@ export default function App() {
   const isDark = theme === 'dark' || (theme === 'system' && systemDark);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Una foto profilo salvata prima del ridimensionamento può pesare megabyte e portare via spazio
+  // al diario: alla prima apertura la si riduce una volta sola.
+  const avatarCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!avatarUrl || avatarCheckedRef.current) return;
+    avatarCheckedRef.current = true;
+    if (avatarUrl.length <= 200_000) return;
+    resizeImageToDataUrl(avatarUrl)
+      .then((small) => handleAvatarChange(small))
+      .catch((error) => console.warn('Foto profilo non ridotta', error));
+  }, [avatarUrl]);
+
+  // Chiede al browser di proteggere i dati dell'app dalla pulizia automatica
+  useEffect(() => {
+    if (isUnlocked) void requestPersistentStorage();
+  }, [isUnlocked]);
+
+  // Promemoria di backup: dopo un mese senza esportare, con abbastanza voci da perdere
+  const [backupTick, setBackupTick] = useState(0);
+  const backupReminder = useMemo(
+    () => getBackupReminder(entries.length),
+    // Si ricalcola a ogni cambio di schermata, per esempio al ritorno dalle Impostazioni
+    // dove puoi aver fatto il backup, e quando l'app viene sbloccata.
+    [entries.length, showSettings, location.pathname, backupTick, isUnlocked],
+  );
 
   // Aggiornamento automatico: appena c'è una nuova versione la applica e ricarica.
   // Se stai scrivendo (diario o nota serale) aspetta, per non farti perdere il testo.
@@ -380,7 +408,7 @@ export default function App() {
 
   // Save entries to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('diary_entries', JSON.stringify(entries));
+    safeSetItem('diary_entries', JSON.stringify(entries));
   }, [entries]);
 
   const saveSettingsLocally = (
@@ -401,7 +429,7 @@ export default function App() {
       theme: currentTheme,
       avatarUrl: currentAvatar,
     };
-    localStorage.setItem('app_settings', JSON.stringify(settings));
+    safeSetItem('app_settings', JSON.stringify(settings));
   };
 
   const handleToggleReminders = async (enabled: boolean) => {
@@ -515,7 +543,7 @@ export default function App() {
           : e
       );
       setEntries(updatedEntries);
-      localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+      safeSetItem('diary_entries', JSON.stringify(updatedEntries));
       setEditingEntry(null);
     } else {
       const now = new Date();
@@ -533,7 +561,7 @@ export default function App() {
 
       const updatedEntries = [newEntry, ...entries];
       setEntries(updatedEntries);
-      localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+      safeSetItem('diary_entries', JSON.stringify(updatedEntries));
 
       // Prevent the server from sending today's morning reminder.
       recordReminderActivity('checkin', localDateKey(now)).catch(error =>
@@ -583,7 +611,7 @@ export default function App() {
     }
 
     setEntries(updatedEntries);
-    localStorage.setItem('diary_entries', JSON.stringify(updatedEntries));
+    safeSetItem('diary_entries', JSON.stringify(updatedEntries));
     recordReminderActivity('evening-note', localDateKey(now)).catch(error =>
       console.warn('Unable to sync evening-note date for push reminders', error)
     );
@@ -688,6 +716,12 @@ export default function App() {
             onOpenEveningNote={() => setShowEveningNote(true)}
             todayEveningNote={todayEveningNote}
             onOpenBreathing={() => setShowBreathing(true)}
+            backupReminder={backupReminder}
+            onOpenBackup={() => setShowSettings(true)}
+            onSnoozeBackup={() => {
+              snoozeBackupReminder();
+              setBackupTick((n) => n + 1);
+            }}
           />
         } />
         <Route path="/home" element={<Navigate to="/" replace />} />
