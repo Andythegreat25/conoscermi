@@ -1,115 +1,116 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Play, Pause, RotateCcw, Wind } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, Wind, Volume2, VolumeX, Vibrate, Sun } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useScrollLock } from '../utils/useScrollLock';
+import {
+  PATTERNS,
+  MINUTE_OPTIONS,
+  PREP_SECONDS,
+  getPattern,
+  cyclesFor,
+  computeView,
+  orbLook,
+  formatRemaining,
+  loadPrefs,
+  savePrefs,
+  type BreathView,
+  type BreathingPrefs,
+  type PatternId,
+  type Phase,
+  type SessionMinutes,
+} from '../utils/breathing';
+import {
+  BreathingSound,
+  canVibrate,
+  canWakeLock,
+  vibrate,
+  type SignalKind,
+} from '../utils/breathingSignals';
 
-type PatternId = '478' | 'box';
-type PhaseKey = 'inhale' | 'hold' | 'exhale' | 'rest';
-
-interface Phase {
-  key: PhaseKey;
-  label: string;
-  seconds: number;
-  /** Scala dell'orb al termine della fase. */
-  scale: number;
-}
-
-interface Pattern {
-  id: PatternId;
-  name: string;
-  description: string;
-  phases: Phase[];
-}
-
-const MAX_SCALE = 1.45;
-
-const PATTERNS: Pattern[] = [
-  {
-    id: '478',
-    name: 'Rilassante 4-7-8',
-    description: 'Inspira 4, trattieni 7, espira 8',
-    phases: [
-      { key: 'inhale', label: 'Inspira', seconds: 4, scale: MAX_SCALE },
-      { key: 'hold', label: 'Trattieni', seconds: 7, scale: MAX_SCALE },
-      { key: 'exhale', label: 'Espira', seconds: 8, scale: 1 },
-    ],
-  },
-  {
-    id: 'box',
-    name: 'Equilibrio 4-4-4-4',
-    description: 'Quattro tempi uguali, come un quadrato',
-    phases: [
-      { key: 'inhale', label: 'Inspira', seconds: 4, scale: MAX_SCALE },
-      { key: 'hold', label: 'Trattieni', seconds: 4, scale: MAX_SCALE },
-      { key: 'exhale', label: 'Espira', seconds: 4, scale: 1 },
-      { key: 'rest', label: 'Trattieni', seconds: 4, scale: 1 },
-    ],
-  },
-];
-
-const CYCLE_OPTIONS = [3, 5, 8] as const;
-
-interface SessionState {
-  started: boolean;
-  phaseIndex: number;
-  secondsLeft: number;
-  completedCycles: number;
-}
-
-type SessionAction =
-  | { type: 'reset'; phases: Phase[] }
-  | { type: 'begin' }
-  | { type: 'tick'; phases: Phase[] };
-
-const initialSession = (phases: Phase[]): SessionState => ({
-  started: false,
-  phaseIndex: 0,
-  secondsLeft: phases[0].seconds,
-  completedCycles: 0,
-});
-
-function sessionReducer(state: SessionState, action: SessionAction): SessionState {
-  switch (action.type) {
-    case 'reset':
-      return initialSession(action.phases);
-    case 'begin':
-      return state.started ? state : { ...state, started: true };
-    case 'tick': {
-      if (state.secondsLeft > 1) return { ...state, secondsLeft: state.secondsLeft - 1 };
-      const next = state.phaseIndex + 1;
-      if (next < action.phases.length) {
-        return { ...state, phaseIndex: next, secondsLeft: action.phases[next].seconds };
-      }
-      // Fine ciclo: si riparte dalla prima fase. A cicli completati `isDone` ferma il timer.
-      return {
-        ...state,
-        completedCycles: state.completedCycles + 1,
-        phaseIndex: 0,
-        secondsLeft: action.phases[0].seconds,
-      };
-    }
-  }
-}
+type Status = 'idle' | 'prep' | 'running' | 'paused' | 'done';
 
 interface BreathingProps {
   onClose: () => void;
 }
 
+function ToggleChip({
+  on,
+  onClick,
+  Icon,
+  label,
+}: {
+  on: boolean;
+  onClick: () => void;
+  Icon: LucideIcon;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onClick}
+      className={`min-h-[44px] px-4 rounded-full flex items-center gap-2 text-sm font-semibold transition-colors duration-200 active:scale-95 ${
+        on ? 'bg-tertiary text-surface' : 'bg-surface-container-highest text-on-surface-variant'
+      }`}
+    >
+      <Icon size={18} />
+      {label}
+    </button>
+  );
+}
+
 export function Breathing({ onClose }: BreathingProps) {
-  const [patternId, setPatternId] = useState<PatternId>('478');
-  const [totalCycles, setTotalCycles] = useState<number>(5);
-  const [isRunning, setIsRunning] = useState(false);
+  const [prefs, setPrefs] = useState<BreathingPrefs>(loadPrefs);
+  const pattern = getPattern(prefs.pattern);
+  const phases = pattern.phases;
+  const totalCycles = cyclesFor(prefs.minutes, phases);
 
-  const pattern = PATTERNS.find((p) => p.id === patternId)!;
-  const [session, dispatch] = useReducer(sessionReducer, pattern.phases, initialSession);
+  const [status, setStatus] = useState<Status>('idle');
+  const [view, setView] = useState<BreathView>(() => computeView(0, phases, totalCycles));
+  const [prepLeft, setPrepLeft] = useState(PREP_SECONDS);
 
-  const isDone = session.completedCycles >= totalCycles;
-  const phase = pattern.phases[session.phaseIndex];
+  // Valori letti dal ciclo di animazione senza doverlo riavviare a ogni cambio
+  const live = useRef({ phases, totalCycles, prefs });
+  live.current = { phases, totalCycles, prefs };
+  const statusRef = useRef<Status>('idle');
+  const setStatusBoth = (next: Status) => {
+    statusRef.current = next;
+    setStatus(next);
+  };
+
+  // Il tempo si misura con l'orologio: `acc` è il tempo già trascorso prima dell'ultima ripresa,
+  // `start` l'istante dell'ultima ripresa. Se il telefono rallenta i timer, non si perde il ritmo.
+  const startRef = useRef(0);
+  const accRef = useRef(0);
+  const prepEndRef = useRef(0);
+  const lastPhaseRef = useRef('');
+  const orbRef = useRef<HTMLDivElement>(null);
+  const soundRef = useRef<BreathingSound | null>(null);
+  const reducedMotion = useRef(false);
 
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
   useScrollLock(true);
+
+  // Preferenze ricordate per la volta dopo
+  useEffect(() => {
+    savePrefs(prefs);
+  }, [prefs]);
+
+  // "Riduci movimento": il cerchio non si allarga, cambia solo la trasparenza
+  useEffect(() => {
+    const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!query) return;
+    reducedMotion.current = query.matches;
+    const onChange = (e: MediaQueryListEvent) => {
+      reducedMotion.current = e.matches;
+    };
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
 
   // Esc chiude la vista
   useEffect(() => {
@@ -120,62 +121,225 @@ export function Breathing({ onClose }: BreathingProps) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // Timer a 1 secondo mentre la sessione è attiva
-  useEffect(() => {
-    if (!isRunning || isDone) return;
-    const id = window.setInterval(() => {
-      dispatch({ type: 'tick', phases: pattern.phases });
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [isRunning, isDone, pattern]);
+  // Alla chiusura si spegne l'audio
+  useEffect(() => () => soundRef.current?.dispose(), []);
 
-  // Al completamento dei cicli la sessione si ferma
-  useEffect(() => {
-    if (isDone) setIsRunning(false);
-  }, [isDone]);
+  const signal = (kind: SignalKind) => {
+    const p = live.current.prefs;
+    if (p.sound) soundRef.current?.play(kind);
+    if (p.vibration) vibrate(kind);
+  };
 
-  const reset = (phases: Phase[] = pattern.phases) => {
-    setIsRunning(false);
-    dispatch({ type: 'reset', phases });
+  const paintOrb = (v: BreathView) => {
+    const el = orbRef.current;
+    if (!el) return;
+    const { scale, opacity } = orbLook(v, live.current.phases, reducedMotion.current);
+    el.style.transform = `scale(${scale})`;
+    el.style.opacity = String(opacity);
+  };
+
+  // Ciclo di animazione: attivo solo durante il conto iniziale e l'esercizio
+  useEffect(() => {
+    if (status !== 'prep' && status !== 'running') return;
+    let raf = 0;
+
+    const frame = () => {
+      const now = performance.now();
+
+      if (statusRef.current === 'prep') {
+        const left = Math.ceil((prepEndRef.current - now) / 1000);
+        if (left <= 0) {
+          startRef.current = now;
+          accRef.current = 0;
+          lastPhaseRef.current = '';
+          setStatusBoth('running'); // il ciclo riparte da solo quando cambia lo stato
+          return;
+        }
+        setPrepLeft(left);
+      } else if (statusRef.current === 'running') {
+        const { phases: ph, totalCycles: cycles } = live.current;
+        const v = computeView(accRef.current + (now - startRef.current), ph, cycles);
+        paintOrb(v);
+
+        const key = `${v.cycle}:${v.phaseIndex}`;
+        if (!v.done && key !== lastPhaseRef.current) {
+          lastPhaseRef.current = key;
+          signal(ph[v.phaseIndex].key);
+        }
+        setView((prev) =>
+          prev.done === v.done &&
+          prev.cycle === v.cycle &&
+          prev.phaseIndex === v.phaseIndex &&
+          prev.secondsLeft === v.secondsLeft
+            ? prev
+            : v,
+        );
+
+        if (v.done) {
+          signal('end');
+          setStatusBoth('done');
+          return;
+        }
+      }
+      raf = requestAnimationFrame(frame);
+    };
+
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [status]);
+
+  // A riposo o a fine esercizio il cerchio torna piccolo, con una transizione morbida
+  useEffect(() => {
+    if (status !== 'idle' && status !== 'done') return;
+    const el = orbRef.current;
+    if (!el) return;
+    el.style.transform = 'scale(1)';
+    el.style.opacity = '0.9';
+  }, [status]);
+
+  // Schermo acceso mentre si respira (dove il telefono lo permette)
+  // Dipende da "attivo" e non dallo stato, così nel passaggio dal conto all'esercizio non si rilascia e riprende
+  const sessionActive = status === 'prep' || status === 'running';
+  useEffect(() => {
+    if (!prefs.wakeLock || !canWakeLock() || !sessionActive) return;
+    let cancelled = false;
+    let lock: WakeLockSentinel | null = null;
+    navigator.wakeLock
+      .request('screen')
+      .then((l) => {
+        if (cancelled) void l.release().catch(() => {});
+        else lock = l;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      void lock?.release().catch(() => {});
+    };
+  }, [sessionActive, prefs.wakeLock]);
+
+  const resetTo = (ph: Phase[], cycles: number) => {
+    accRef.current = 0;
+    lastPhaseRef.current = '';
+    setView(computeView(0, ph, cycles));
+    setPrepLeft(PREP_SECONDS);
+    setStatusBoth('idle');
+  };
+
+  const pause = () => {
+    if (statusRef.current !== 'running') return;
+    accRef.current += performance.now() - startRef.current;
+    setStatusBoth('paused');
+  };
+
+  // Se esci dall'app l'esercizio si ferma: così al ritorno non è andato avanti da solo
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (statusRef.current === 'running') pause();
+      else if (statusRef.current === 'prep') resetTo(live.current.phases, live.current.totalCycles);
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+
+  const start = () => {
+    // L'audio si può attivare solo dentro un tocco: questo lo è
+    if (prefs.sound) {
+      soundRef.current ??= new BreathingSound();
+      soundRef.current.prepare();
+    }
+    accRef.current = 0;
+    lastPhaseRef.current = '';
+    setView(computeView(0, phases, totalCycles));
+    prepEndRef.current = performance.now() + PREP_SECONDS * 1000;
+    setPrepLeft(PREP_SECONDS);
+    setStatusBoth('prep');
+  };
+
+  const resume = () => {
+    if (prefs.sound) soundRef.current?.prepare();
+    startRef.current = performance.now();
+    setStatusBoth('running');
   };
 
   const handlePrimary = () => {
-    if (isDone) {
-      dispatch({ type: 'reset', phases: pattern.phases });
-      dispatch({ type: 'begin' });
-      setIsRunning(true);
-      return;
-    }
-    if (isRunning) {
-      setIsRunning(false);
-    } else {
-      dispatch({ type: 'begin' });
-      setIsRunning(true);
-    }
+    if (status === 'idle' || status === 'done') start();
+    else if (status === 'prep') resetTo(phases, totalCycles);
+    else if (status === 'running') pause();
+    else if (status === 'paused') resume();
   };
 
   const selectPattern = (id: PatternId) => {
-    if (id === patternId) return;
-    setPatternId(id);
-    reset(PATTERNS.find((p) => p.id === id)!.phases);
+    if (id === prefs.pattern) return;
+    setPrefs((p) => ({ ...p, pattern: id }));
+    const next = getPattern(id).phases;
+    resetTo(next, cyclesFor(prefs.minutes, next));
   };
 
-  const selectCycles = (n: number) => {
-    setTotalCycles(n);
-    reset();
+  const selectMinutes = (minutes: SessionMinutes) => {
+    if (minutes === prefs.minutes) return;
+    setPrefs((p) => ({ ...p, minutes }));
+    resetTo(phases, cyclesFor(minutes, phases));
   };
 
-  const orbScale = session.started && !isDone ? phase.scale : 1;
-  const orbOpacity = session.started && !isDone ? (phase.scale > 1 ? 1 : 0.8) : 0.9;
-  const headline = isDone ? 'Sessione completata' : session.started ? phase.label : 'Pronto';
-  const subline = isDone
-    ? `${totalCycles} ${totalCycles === 1 ? 'ciclo' : 'cicli'}. Prenditi un attimo prima di riprendere.`
-    : session.started
-      ? isRunning
-        ? 'Segui il ritmo del cerchio'
-        : 'In pausa'
-      : 'Scegli un ritmo e premi Avvia';
-  const currentCycle = Math.min(session.completedCycles + 1, totalCycles);
+  const toggleSound = () => {
+    const next = !prefs.sound;
+    if (next) {
+      // Un tono di prova, dentro il tocco: si sente subito se funziona
+      soundRef.current ??= new BreathingSound();
+      soundRef.current.prepare();
+      soundRef.current.play('inhale');
+    }
+    setPrefs((p) => ({ ...p, sound: next }));
+  };
+
+  const toggleVibration = () => {
+    const next = !prefs.vibration;
+    if (next) vibrate('inhale');
+    setPrefs((p) => ({ ...p, vibration: next }));
+  };
+
+  const toggleWakeLock = () => setPrefs((p) => ({ ...p, wakeLock: !p.wakeLock }));
+
+  const inSession = status === 'prep' || status === 'running' || status === 'paused';
+  const orbMoves = status === 'prep' || status === 'running';
+  const phase = phases[view.phaseIndex];
+
+  const orbNumber =
+    status === 'prep' ? prepLeft : inSession ? view.secondsLeft : status === 'done' ? '✓' : '';
+  const headline =
+    status === 'done'
+      ? 'Sessione completata'
+      : status === 'prep'
+        ? 'Mettiti comodo'
+        : status === 'paused'
+          ? 'In pausa'
+          : status === 'running'
+            ? phase.label
+            : 'Pronto';
+  const minutesLabel = `${prefs.minutes} ${prefs.minutes === 1 ? 'minuto' : 'minuti'}`;
+  const subline =
+    status === 'done'
+      ? `${totalCycles} cicli in circa ${minutesLabel}. Prenditi un attimo prima di riprendere.`
+      : status === 'prep'
+        ? 'Rilassa le spalle. Si parte tra poco.'
+        : status === 'paused'
+          ? 'Premi Riprendi quando sei pronto'
+          : status === 'running'
+            ? 'Segui il ritmo del cerchio'
+            : `Circa ${totalCycles} cicli, ${minutesLabel}`;
+
+  const primaryLabel =
+    status === 'prep'
+      ? 'Annulla'
+      : status === 'running'
+        ? 'Pausa'
+        : status === 'paused'
+          ? 'Riprendi'
+          : status === 'done'
+            ? 'Ripeti'
+            : 'Avvia';
+  const PrimaryIcon = status === 'running' ? Pause : status === 'prep' ? X : Play;
 
   return createPortal(
     <div
@@ -206,75 +370,102 @@ export function Breathing({ onClose }: BreathingProps) {
           </button>
         </header>
 
-        <div className="mt-4 grid grid-cols-1 gap-2" role="radiogroup" aria-label="Ritmo">
-          {PATTERNS.map((p) => {
-            const active = p.id === patternId;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => selectPattern(p.id)}
-                className={`min-h-[56px] text-left rounded-2xl px-4 py-2.5 border-2 transition-colors duration-200 active:scale-[0.99] ${
-                  active
-                    ? 'bg-surface-container-lowest border-tertiary'
-                    : 'bg-surface-container-low border-transparent hover:bg-surface-container'
-                }`}
-              >
-                <p className="font-bold text-sm">{p.name}</p>
-                <p className="text-xs text-on-surface-variant">{p.description}</p>
-              </button>
-            );
-          })}
-        </div>
+        {inSession ? (
+          <p className="mt-2 text-center text-xs font-bold uppercase tracking-widest text-outline">
+            {pattern.name} · {prefs.minutes} min
+          </p>
+        ) : (
+          <>
+            <div className="mt-4 grid grid-cols-1 gap-2" role="radiogroup" aria-label="Ritmo">
+              {PATTERNS.map((p) => {
+                const active = p.id === prefs.pattern;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => selectPattern(p.id)}
+                    className={`min-h-[56px] text-left rounded-2xl px-4 py-2.5 border-2 transition-colors duration-200 active:scale-[0.99] ${
+                      active
+                        ? 'bg-surface-container-lowest border-tertiary'
+                        : 'bg-surface-container-low border-transparent hover:bg-surface-container'
+                    }`}
+                  >
+                    <p className="font-bold text-sm">{p.name}</p>
+                    <p className="text-xs text-on-surface-variant">{p.description}</p>
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-widest text-outline">Cicli</span>
-          <div className="flex gap-2" role="radiogroup" aria-label="Numero di cicli">
-            {CYCLE_OPTIONS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={n === totalCycles}
-                onClick={() => selectCycles(n)}
-                className={`min-w-[44px] min-h-[44px] rounded-full text-sm font-bold tabular-nums transition-colors duration-200 active:scale-95 ${
-                  n === totalCycles
-                    ? 'bg-tertiary text-surface'
-                    : 'bg-surface-container-highest text-on-surface-variant'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-widest text-outline">Durata</span>
+              <div className="flex gap-2" role="radiogroup" aria-label="Durata in minuti">
+                {MINUTE_OPTIONS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={m === prefs.minutes}
+                    onClick={() => selectMinutes(m)}
+                    className={`min-w-[56px] min-h-[44px] rounded-full text-sm font-bold tabular-nums transition-colors duration-200 active:scale-95 ${
+                      m === prefs.minutes
+                        ? 'bg-tertiary text-surface'
+                        : 'bg-surface-container-highest text-on-surface-variant'
+                    }`}
+                  >
+                    {m} min
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center py-8">
+            <div className="mt-3" role="group" aria-label="Segnali">
+              <div className="flex flex-wrap gap-2">
+                <ToggleChip
+                  on={prefs.sound}
+                  onClick={toggleSound}
+                  Icon={prefs.sound ? Volume2 : VolumeX}
+                  label="Suono"
+                />
+                {canVibrate() && (
+                  <ToggleChip on={prefs.vibration} onClick={toggleVibration} Icon={Vibrate} label="Vibrazione" />
+                )}
+                {canWakeLock() && (
+                  <ToggleChip on={prefs.wakeLock} onClick={toggleWakeLock} Icon={Sun} label="Schermo acceso" />
+                )}
+              </div>
+              {prefs.sound && (
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  Con il tasto silenzioso del telefono attivo, il suono non si sente.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        <div className="flex-1 flex flex-col items-center justify-center py-6">
           <div className="relative w-64 h-64 flex items-center justify-center">
             <div className="absolute inset-0 rounded-full border border-tertiary/20" />
             <div
-              className="breath-orb w-40 h-40 rounded-full bg-tertiary shadow-[0_0_48px_rgba(20,105,100,0.35),inset_0_8px_24px_rgba(255,255,255,0.18)] transition-[transform,opacity] ease-in-out"
-              style={{
-                transform: `scale(${orbScale})`,
-                opacity: orbOpacity,
-                transitionDuration: `${session.started && !isDone ? phase.seconds * 1000 : 400}ms`,
-              }}
+              ref={orbRef}
+              className={`breath-orb w-40 h-40 rounded-full bg-tertiary shadow-[0_0_48px_rgba(20,105,100,0.35),inset_0_8px_24px_rgba(255,255,255,0.18)] ${
+                orbMoves ? '' : 'transition-[transform,opacity] duration-500 ease-in-out'
+              }`}
+              style={{ transform: 'scale(1)', opacity: 0.9 }}
             />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-5xl font-extrabold tabular-nums text-surface">
-                {session.started && !isDone ? session.secondsLeft : isDone ? '✓' : ''}
-              </span>
+              <span className="text-5xl font-extrabold tabular-nums text-surface">{orbNumber}</span>
             </div>
           </div>
 
           <div className="mt-6 text-center" aria-live="polite">
             <p className="text-2xl font-extrabold tracking-tight">{headline}</p>
             <p className="mt-1 text-sm text-on-surface-variant">{subline}</p>
-            {session.started && !isDone && (
+            {(status === 'running' || status === 'paused') && (
               <p className="mt-3 text-xs font-bold uppercase tracking-widest text-outline tabular-nums">
-                Ciclo {currentCycle} di {totalCycles}
+                Ciclo {view.cycle} di {totalCycles} · restano {formatRemaining(view.remainingMs)}
               </p>
             )}
           </div>
@@ -283,8 +474,8 @@ export function Breathing({ onClose }: BreathingProps) {
         <div className="flex gap-3">
           <button
             type="button"
-            onClick={() => reset()}
-            disabled={!session.started}
+            onClick={() => resetTo(phases, totalCycles)}
+            disabled={status === 'idle'}
             className="flex-1 min-h-[56px] rounded-full bg-surface-container-highest text-on-surface font-bold flex items-center justify-center gap-2 transition-[transform,opacity] duration-200 active:scale-95 disabled:opacity-40 disabled:active:scale-100"
           >
             <RotateCcw size={20} />
@@ -295,8 +486,8 @@ export function Breathing({ onClose }: BreathingProps) {
             onClick={handlePrimary}
             className="flex-[1.4] min-h-[56px] rounded-full bg-primary text-on-primary font-bold flex items-center justify-center gap-2 transition-transform duration-200 active:scale-95"
           >
-            {isRunning ? <Pause size={20} /> : <Play size={20} />}
-            {isDone ? 'Ripeti' : isRunning ? 'Pausa' : session.started ? 'Riprendi' : 'Avvia'}
+            <PrimaryIcon size={20} />
+            {primaryLabel}
           </button>
         </div>
       </div>
