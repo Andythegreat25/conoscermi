@@ -1,96 +1,128 @@
 import { DiaryEntry } from '../types';
 
-/** Returns true if the entry counts as a real check-in (not an evening-note-only entry). */
-function isRealCheckin(entry: DiaryEntry): boolean {
-  return !entry.eveningNoteOnly;
+/**
+ * Serie di giorni con check-in, con un giorno di pausa a settimana.
+ *
+ * Regola: una volta per settimana (da lunedì a domenica) un solo giorno senza check-in non
+ * azzera la serie. Due giorni di fila mancanti la azzerano comunque, e una seconda lacuna
+ * nella stessa settimana pure. Il giorno di pausa non fa salire il numero: la serie conta
+ * solo i giorni in cui hai fatto il check-in.
+ *
+ * Il calcolo va in avanti, dal primo giorno a oggi, così una pausa già usata non cambia
+ * significato quando passano i giorni.
+ */
+
+const DAY_MS = 86_400_000;
+
+/** Numero progressivo del giorno di calendario locale. Passa da UTC, quindi l'ora legale non pesa. */
+function dayNumber(d: Date): number {
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
 }
 
-function hasEntryForDay(entries: DiaryEntry[], d: Date): boolean {
-  const start = new Date(d);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(d);
-  end.setHours(23, 59, 59, 999);
-  return entries.some(
-    e => isRealCheckin(e) && e.timestamp >= start.getTime() && e.timestamp <= end.getTime()
-  );
+/** Numero del lunedì della settimana a cui appartiene il giorno. */
+function weekOf(day: number): number {
+  const weekday = new Date(day * DAY_MS).getUTCDay(); // 0 = domenica
+  return day - ((weekday + 6) % 7);
 }
 
-/** Current consecutive-day streak (resets if you miss a day). */
-export function calculateStreak(entries: DiaryEntry[]): number {
-  if (!entries || entries.length === 0) return 0;
+const WEEKDAYS = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 
+/** Nome del giorno della settimana, in italiano. */
+export function weekdayName(day: number): string {
+  return WEEKDAYS[new Date(day * DAY_MS).getUTCDay()];
+}
+
+/** I giorni di calendario con almeno un check-in vero (le sole note serali non contano). */
+function checkinDays(entries: DiaryEntry[]): number[] {
+  const days = new Set<number>();
+  for (const e of entries ?? []) {
+    if (e.eveningNoteOnly) continue;
+    days.add(dayNumber(new Date(e.timestamp)));
+  }
+  return [...days].sort((a, b) => a - b);
+}
+
+export interface StreakDetails {
+  /** Serie in corso. */
+  streak: number;
+  /** Serie più lunga di sempre. */
+  record: number;
+  /** Il giorno di pausa già usato questa settimana (se la serie è viva), come numero di giorno. */
+  pauseDay: number | null;
+  /** Ieri non c'è stato il check-in e la pausa lo copre: oggi si riparte. */
+  pausedYesterday: boolean;
+  /** Questa settimana la pausa si può ancora usare. */
+  pauseAvailable: boolean;
+}
+
+export function streakDetails(entries: DiaryEntry[], now: Date = new Date()): StreakDetails {
+  const days = checkinDays(entries);
+  const today = dayNumber(now);
+  const empty: StreakDetails = { streak: 0, record: 0, pauseDay: null, pausedYesterday: false, pauseAvailable: true };
+  if (days.length === 0) return empty;
+
+  const pauseByWeek = new Map<number, number>(); // lunedì della settimana → giorno perdonato
+  let run = 0;
+  let record = 0;
+  let last = days[0];
+
+  days.forEach((d, i) => {
+    if (i === 0) {
+      run = 1;
+    } else {
+      const gap = d - last - 1;
+      if (gap === 0) {
+        run += 1;
+      } else if (gap === 1 && !pauseByWeek.has(weekOf(d - 1))) {
+        pauseByWeek.set(weekOf(d - 1), d - 1);
+        run += 1;
+      } else {
+        run = 1;
+      }
+    }
+    record = Math.max(record, run);
+    last = d;
+  });
+
+  // Com'è la serie oggi? Oggi può essere ancora aperto: la giornata non è finita.
+  const gapToday = today - last - 1;
   let streak = 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  let currentDate = new Date(today);
-
-  if (hasEntryForDay(entries, today)) {
-    streak = 1;
-    currentDate.setDate(currentDate.getDate() - 1);
-  } else {
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (hasEntryForDay(entries, yesterday)) {
-      currentDate.setDate(currentDate.getDate() - 1);
-    } else {
-      return 0;
-    }
+  let pausedYesterday = false;
+  if (gapToday <= 0) {
+    streak = run;
+  } else if (gapToday === 1 && !pauseByWeek.has(weekOf(today - 1))) {
+    // Ieri è mancato, oggi non ancora: la pausa lo copre se è libera
+    streak = run;
+    pausedYesterday = true;
+    pauseByWeek.set(weekOf(today - 1), today - 1);
   }
 
-  while (true) {
-    if (hasEntryForDay(entries, currentDate)) {
-      streak++;
-      currentDate.setDate(currentDate.getDate() - 1);
-    } else {
-      break;
-    }
-  }
+  const thisWeek = weekOf(today);
+  const pauseDay = streak > 0 ? (pauseByWeek.get(thisWeek) ?? null) : null;
+  return {
+    streak,
+    record: Math.max(record, streak),
+    pauseDay,
+    pausedYesterday,
+    pauseAvailable: !pauseByWeek.has(thisWeek),
+  };
+}
 
-  return streak;
+/** Serie in corso (con il giorno di pausa a settimana). */
+export function calculateStreak(entries: DiaryEntry[]): number {
+  return streakDetails(entries).streak;
 }
 
 /**
- * Maximum streak ever achieved — computed from the full entry history.
- * Badges use this value so they are NEVER taken away once earned.
+ * Serie più lunga di sempre, calcolata su tutta la storia.
+ * I traguardi usano questo valore: una volta ottenuti non si perdono mai.
  */
 export function calculateMaxStreak(entries: DiaryEntry[]): number {
-  const realEntries = entries.filter(isRealCheckin);
-  if (realEntries.length === 0) return 0;
-
-  // Collect unique calendar days as 'yyyy-mm-dd' strings
-  const dateSet = new Set<string>();
-  realEntries.forEach(e => {
-    const d = new Date(e.timestamp);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    dateSet.add(key);
-  });
-
-  const dates = Array.from(dateSet).sort(); // ascending
-
-  let maxStreak = 1;
-  let current = 1;
-
-  for (let i = 1; i < dates.length; i++) {
-    const prev = new Date(dates[i - 1]);
-    const curr = new Date(dates[i]);
-    const diffDays = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 1) {
-      current++;
-      if (current > maxStreak) maxStreak = current;
-    } else {
-      current = 1;
-    }
-  }
-
-  // Also compare with current streak (handles today's check-in)
-  const currentStreak = calculateStreak(entries);
-  return Math.max(maxStreak, currentStreak);
+  return streakDetails(entries).record;
 }
 
-/** True if the user has already done a real check-in today. */
+/** True se oggi hai già fatto un check-in vero. */
 export function hasCheckedInToday(entries: DiaryEntry[]): boolean {
-  const today = new Date();
-  return hasEntryForDay(entries, today);
+  const today = dayNumber(new Date());
+  return checkinDays(entries).includes(today);
 }

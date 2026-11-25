@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { PenSquare, Heart, Flame, Leaf, Award, Sprout, Trophy, Gem, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { DiaryEntry, Mood } from '../types';
-import { calculateStreak, calculateMaxStreak } from '../utils/streak';
+import { streakDetails, weekdayName } from '../utils/streak';
 import { weeklySummary, moodCalendar } from '../utils/insights';
 
 interface JourneyProps {
@@ -49,8 +49,7 @@ export function Journey({ entries, onOpenDiaryEntry }: JourneyProps) {
 
   const totalDays = calculateTotalDays();
   const totalEntries = entries.length;
-  const streak = calculateStreak(entries);
-  const maxStreak = calculateMaxStreak(entries);
+  const { streak, record: maxStreak, pauseDay, pauseAvailable } = streakDetails(entries);
 
   // Calculate "Sentita meglio" percentage
   const positiveMoods = entries.filter(e => e.mood === 'Meglio' || e.mood === 'Forte').length;
@@ -134,6 +133,13 @@ export function Journey({ entries, onOpenDiaryEntry }: JourneyProps) {
             <div className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Giorni di fila</div>
             {maxStreak > streak && (
               <div className="text-[10px] text-secondary/70 font-bold mt-0.5">Record: {maxStreak}</div>
+            )}
+            {streak > 0 && (
+              <div className="text-[10px] text-on-surface-variant/70 font-medium mt-0.5">
+                {pauseAvailable
+                  ? 'Pausa della settimana: libera'
+                  : `Pausa usata${pauseDay !== null ? ` (${weekdayName(pauseDay)})` : ''}`}
+              </div>
             )}
           </div>
         </div>

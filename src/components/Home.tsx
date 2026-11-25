@@ -1,7 +1,7 @@
 import { Flame, PenSquare, Heart, Quote, Activity, BookHeart, Clock, History, Moon, AlertCircle, Wind, Download } from 'lucide-react';
 import { Mood, DiaryEntry } from '../types';
 import { useMemo } from 'react';
-import { calculateStreak, hasCheckedInToday } from '../utils/streak';
+import { streakDetails, hasCheckedInToday } from '../utils/streak';
 import { findTimeCapsule } from '../utils/insights';
 
 interface HomeProps {
@@ -61,7 +61,7 @@ export function Home({
   // Capsula del tempo: un pensiero di un anno, tre mesi o un mese fa, con qualche giorno di margine
   const timeCapsuleEntry = useMemo(() => findTimeCapsule(entries), [entries]);
 
-  const streak = calculateStreak(entries);
+  const { streak, pausedYesterday } = streakDetails(entries);
   const checkedInToday = hasCheckedInToday(entries);
   const totalEntries = entries.length;
   const lastEntryTime = entries[0]?.time || '--:--';
@@ -80,7 +80,7 @@ export function Home({
   // ── #2 Micro-label contestuale per lo streak ──────────────────────────────
   const streakLabel = (() => {
     if (streak === 0) return "Inizia oggi! 🌱";
-    if (!checkedInToday) return "check-in per continuare!";
+    if (!checkedInToday) return pausedYesterday ? "ieri era la tua pausa: oggi si riparte" : "check-in per continuare!";
     if (streak === 1 && totalEntries <= 1) return "Primo giorno! 🌱";
     if (streak === 1 && totalEntries > 1) return "Ripartita oggi 💪";
     return "ce la stai facendo";
